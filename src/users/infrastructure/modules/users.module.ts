@@ -10,6 +10,7 @@ import { UsersLoginMongoImplementation } from "../implementations/users-login-mo
 import { JwtModule } from "@nestjs/jwt";
 import { JwtStrategy } from "../../../shared/infrastructure/strategies/jwt.strategy";
 import { JwtAuthGuard } from "../../../shared/infrastructure/guards/jwt-auth.guard";
+import { UsersMeController } from "../controllers/users-me.controller";
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { JwtAuthGuard } from "../../../shared/infrastructure/guards/jwt-auth.gua
       signOptions: { expiresIn: "1d" },
     }),
   ],
-  controllers: [UsersLoginController],
+  controllers: [UsersLoginController, UsersMeController],
   providers: [
     JwtStrategy,
     JwtAuthGuard,
