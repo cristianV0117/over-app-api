@@ -4,6 +4,7 @@ import { UsersLoginValueObject } from "../domain/valueObjects/users-login.valueO
 import { UserLoginDTO } from "../infrastructure/dtos/users-login.dto";
 import { UserLogin } from "../domain/user-login";
 import { UsersAuthenticatedUseCase } from "./users-authenticated.usecase";
+import { UsersStoreValueObject } from "../domain/valueObjects/users-store.valueObjects";
 
 @Injectable()
 export class UsersLoginUseCase {
@@ -18,5 +19,22 @@ export class UsersLoginUseCase {
       new UsersLoginValueObject(body.email, body.password)
     );
     return await this.usersAuthenticatedUseCase.authenticated(user);
+  }
+
+  async loginGoogle(name: string, email: string): Promise<UserLogin> {
+    const ensureShow = await this.usersLoginRepository.ensureShow(email);
+    if (!ensureShow) {
+      const userCreatedOfGoole = await this.usersLoginRepository.store(
+        new UsersStoreValueObject(name, email, null)
+      );
+
+      return await this.usersAuthenticatedUseCase.authenticated(
+        userCreatedOfGoole
+      );
+    }
+
+    return await this.usersAuthenticatedUseCase.authenticated(
+      await this.usersLoginRepository.show(email)
+    );
   }
 }

@@ -1,12 +1,15 @@
-// src/users/infrastructure/controllers/users-google.controller.ts
 import { Controller, Get, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { JwtService } from "@nestjs/jwt";
 import { Response } from "express";
+import { UsersLoginUseCase } from "src/users/application/users-login.usecase";
 
 @Controller("auth/google")
 export class UsersLoginGoogleController {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly usersLoginUseCase: UsersLoginUseCase
+  ) {}
 
   @Get()
   @UseGuards(AuthGuard("google"))
@@ -16,20 +19,16 @@ export class UsersLoginGoogleController {
 
   @Get("callback")
   @UseGuards(AuthGuard("google"))
-  googleCallback(@Req() req, @Res() res: Response) {
-    const user = req.user;
+  async googleCallback(@Req() req, @Res() res: Response) {
+    const userRequest = req.user;
 
-    const token = this.jwtService.sign(
-      {
-        sub: 1,
-        email: user.email,
-        name: user.name,
-      },
-      { secret: process.env.JWT_SECRET || "secretKey" }
+    const user = await this.usersLoginUseCase.loginGoogle(
+      userRequest.name,
+      userRequest.email
     );
 
     return res.redirect(
-      `${process.env.FRONTEND_URL}/google-callback?token=${token}`
+      `${process.env.FRONTEND_URL}/google-callback?token=${user.getToken()}`
     );
   }
 }
