@@ -13,8 +13,8 @@ export class UsersAuthenticatedUseCase {
     private readonly usersAuthenticatedRepository: UsersAuthenticatedRepository
   ) {}
 
-  authenticated(user: User, response: AuthCookieManager): UserLogin {
-    return this.usersAuthenticatedRepository.authenticated(user, response);
+  authenticated(user: User): Promise<UserLogin> {
+    return this.usersAuthenticatedRepository.authenticated(user);
   }
 
   async logOut(response: AuthCookieManager): Promise<void> {

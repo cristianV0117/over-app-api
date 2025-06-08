@@ -28,12 +28,8 @@ export class UsersLoginGoogleController {
       { secret: process.env.JWT_SECRET || "secretKey" }
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.PROD == "true",
-      sameSite: process.env.PROD == "true" ? "none" : "lax",
-    });
-
-    return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/google-callback?token=${token}`
+    );
   }
 }
