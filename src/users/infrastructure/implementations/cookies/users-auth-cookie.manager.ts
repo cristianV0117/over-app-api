@@ -7,7 +7,7 @@ export class UsersAuthCookieManager implements AuthCookieManager {
   createAuthCookie(token: string): void {
     this.response.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.PROD == "true" ? true : false,
+      secure: process.env.PROD == "true",
       sameSite: process.env.PROD == "true" ? "none" : "lax",
     });
   }

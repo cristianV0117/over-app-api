@@ -30,8 +30,8 @@ export class UsersLoginGoogleController {
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      secure: process.env.PROD == "true",
+      sameSite: process.env.PROD == "true" ? "none" : "lax",
     });
 
     return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
