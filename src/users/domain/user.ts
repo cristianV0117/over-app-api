@@ -17,11 +17,11 @@ export class User {
     return this.props.id;
   }
 
-  public getName(): string | undefined {
+  public getName(): string {
     return this.props.name;
   }
 
-  public getEmail(): string | undefined {
+  public getEmail(): string {
     return this.props.email;
   }
 

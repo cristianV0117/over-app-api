@@ -1,18 +1,20 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
+import * as cookieParser from "cookie-parser";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(cookieParser());
   app.enableCors({
-    origin: "http://localhost:3000", // frontend (Next.js)
+    origin: process.env.FRONTEND_URL, // frontend
     credentials: true,
   });
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Elimina propiedades no definidas en el DTO
-      forbidNonWhitelisted: true, // Lanza error si vienen propiedades no deseadas
-      transform: true, // Transforma payloads en instancias de clase
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     })
   );
   await app.listen(process.env.PORT ?? 3001);

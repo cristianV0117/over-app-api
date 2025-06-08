@@ -6,19 +6,17 @@ import {
 } from "src/shared/infrastructure/mongo/schemas/user.schema";
 import { UsersLoginRepository } from "src/users/domain/repositories/users-login.repository";
 import { UsersLoginValueObject } from "src/users/domain/valueObjects/users-login.valueObject";
-import { JwtService } from "@nestjs/jwt";
 import { UsersInvalidCredentialsException } from "src/users/domain/exceptions/users-invalid-credentials.exception";
 import * as bcrypt from "bcrypt";
-import { UserLogin } from "src/users/domain/user-login";
+import { User } from "src/users/domain/user";
 
 export class UsersLoginMongoImplementation implements UsersLoginRepository {
   constructor(
     @InjectModel(UserModel.name)
-    private readonly userModel: Model<UserDocument>,
-    private readonly jwtService: JwtService
+    private readonly userModel: Model<UserDocument>
   ) {}
 
-  async login(userLogin: UsersLoginValueObject): Promise<UserLogin> {
+  async login(userLogin: UsersLoginValueObject): Promise<User> {
     const user = await this.userModel.findOne({ email: userLogin.getEmail() });
 
     if (!user) {
@@ -35,15 +33,11 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
       throw new UsersInvalidCredentialsException();
     }
 
-    const token = this.jwtService.sign({
-      sub: user.id.toString(),
-      email: user.email,
-    });
-
-    return new UserLogin({
+    return new User({
+      id: user.id.toString(),
       email: userLogin.getEmail(),
-      token: token,
       password: userLogin.getPassword(),
+      name: user.name,
     });
   }
 }

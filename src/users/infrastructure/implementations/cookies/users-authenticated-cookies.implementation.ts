@@ -1,0 +1,38 @@
+import { Injectable } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import {
+  AuthCookieManager,
+  UsersAuthenticatedRepository,
+} from "src/users/domain/repositories/users-authenticated.repository";
+import { User } from "src/users/domain/user";
+import { UserLogin } from "src/users/domain/user-login";
+
+@Injectable()
+export class UsersAuthenticatedCookiesImplementation
+  implements UsersAuthenticatedRepository
+{
+  constructor(private readonly jwtService: JwtService) {}
+
+  async logout(response: AuthCookieManager): Promise<void> {
+    await Promise.resolve(response.clearAuthCookie());
+  }
+
+  async authenticated(user: User): Promise<UserLogin> {
+    const token = this.jwtService.sign(
+      {
+        sub: user.getId(),
+        email: user.getEmail(),
+        name: user.getName(),
+      },
+      { secret: process.env.JWT_SECRET || "secretKey" }
+    );
+    return Promise.resolve(
+      new UserLogin({
+        email: user.getEmail(),
+        token: token,
+        password: "",
+        name: user.getName(),
+      })
+    );
+  }
+}
