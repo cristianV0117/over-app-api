@@ -17,7 +17,7 @@ export class UsersAuthenticatedCookiesImplementation
     await Promise.resolve(response.clearAuthCookie());
   }
 
-  authenticated(user: User, response: AuthCookieManager): UserLogin {
+  authenticated(user: User): Promise<UserLogin> {
     const token = this.jwtService.sign(
       {
         sub: user.getId(),
@@ -26,12 +26,13 @@ export class UsersAuthenticatedCookiesImplementation
       },
       { secret: process.env.JWT_SECRET || "secretKey" }
     );
-    response.createAuthCookie(token);
-    return new UserLogin({
-      email: user.getEmail(),
-      token: token,
-      password: "",
-      name: user.getName(),
-    });
+    return Promise.resolve(
+      new UserLogin({
+        email: user.getEmail(),
+        token: token,
+        password: "",
+        name: user.getName(),
+      })
+    );
   }
 }

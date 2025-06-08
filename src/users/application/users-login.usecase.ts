@@ -4,7 +4,6 @@ import { UsersLoginValueObject } from "../domain/valueObjects/users-login.valueO
 import { UserLoginDTO } from "../infrastructure/dtos/users-login.dto";
 import { UserLogin } from "../domain/user-login";
 import { UsersAuthenticatedUseCase } from "./users-authenticated.usecase";
-import { AuthCookieManager } from "../domain/repositories/users-authenticated.repository";
 
 @Injectable()
 export class UsersLoginUseCase {
@@ -14,13 +13,10 @@ export class UsersLoginUseCase {
     private readonly usersAuthenticatedUseCase: UsersAuthenticatedUseCase
   ) {}
 
-  async login(
-    body: UserLoginDTO,
-    response: AuthCookieManager
-  ): Promise<UserLogin> {
+  async login(body: UserLoginDTO): Promise<UserLogin> {
     const user = await this.usersLoginRepository.login(
       new UsersLoginValueObject(body.email, body.password)
     );
-    return this.usersAuthenticatedUseCase.authenticated(user, response);
+    return await this.usersAuthenticatedUseCase.authenticated(user);
   }
 }
