@@ -12,8 +12,9 @@ export class UsersAuthenticatedUseCase {
     @Inject("UsersAuthenticatedRepository")
     private readonly usersAuthenticatedRepository: UsersAuthenticatedRepository
   ) {}
-  async authenticated(user: User): Promise<UserLogin> {
-    return await this.usersAuthenticatedRepository.authenticated(user);
+
+  authenticated(user: User, response: AuthCookieManager): UserLogin {
+    return this.usersAuthenticatedRepository.authenticated(user, response);
   }
 
   async logOut(response: AuthCookieManager): Promise<void> {
