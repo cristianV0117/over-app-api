@@ -7,6 +7,6 @@ export class UsersMeController {
   @UseGuards(JwtAuthGuard)
   @Get()
   getProfile(@Req() req: RequestWithUser) {
-    return req.user; // ahora tipado correctamente
+    return req.user;
   }
 }

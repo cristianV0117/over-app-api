@@ -9,7 +9,11 @@ export class UserLogin extends User {
     this.propsLogin = props;
   }
 
-  public getEmail() {
+  public getName(): string {
+    return this.propsLogin.name;
+  }
+
+  public getEmail(): string {
     return this.propsLogin.email;
   }
 

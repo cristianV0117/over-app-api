@@ -1,6 +1,6 @@
-import { UserLogin } from "../user-login";
+import { User } from "../user";
 import { UsersLoginValueObject } from "../valueObjects/users-login.valueObject";
 
 export interface UsersLoginRepository {
-  login(userLogin: UsersLoginValueObject): Promise<UserLogin>;
+  login(userLogin: UsersLoginValueObject): Promise<User>;
 }
