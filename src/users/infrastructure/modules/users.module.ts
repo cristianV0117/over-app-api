@@ -18,14 +18,27 @@ import { UsersForgotPasswordController } from "../controllers/users-forgot-passw
 import { MailService } from "src/shared/infrastructure/services/mail.service";
 import { UsersAuthenticatedCookiesImplementation } from "../implementations/cookies/users-authenticated-cookies.implementation";
 import { UsersAuthenticatedUseCase } from "src/users/application/users-authenticated.usecase";
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import {
+  LoginLogModel,
+  LoginLogSchema,
+} from "src/shared/infrastructure/mongo/schemas/login-log.schema";
+import { UserLoggedInListener } from "../events/user-logged-in.listener";
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: UserModel.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: UserModel.name, schema: UserSchema },
+      {
+        name: LoginLogModel.name,
+        schema: LoginLogSchema,
+      },
+    ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || "secretKey",
       signOptions: { expiresIn: "1d" },
     }),
+    EventEmitterModule.forRoot(),
   ],
   controllers: [
     UsersLoginController,
@@ -35,6 +48,7 @@ import { UsersAuthenticatedUseCase } from "src/users/application/users-authentic
     UsersForgotPasswordController,
   ],
   providers: [
+    UserLoggedInListener,
     GoogleStrategy,
     JwtStrategy,
     JwtAuthGuard,
