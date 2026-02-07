@@ -19,4 +19,4 @@ import {
   ],
   controllers: [],
 })
-export class SharedModule {}
+export class SharedModule { }
