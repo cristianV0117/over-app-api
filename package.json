@@ -11,6 +11,7 @@
     "start": "nest start",
     "seed:status": "ts-node -r tsconfig-paths/register src/shared/infrastructure/mongo/seeders/status.seeder.ts",
     "seed:users": "ts-node -r tsconfig-paths/register src/shared/infrastructure/mongo/seeders/user.seeder.ts",
+    "seed:task-status": "ts-node -r tsconfig-paths/register src/shared/infrastructure/mongo/seeders/task-status.seeder.ts",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",

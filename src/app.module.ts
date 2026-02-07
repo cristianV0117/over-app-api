@@ -6,6 +6,7 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { SharedModule } from "./shared/infrastructure/modules/shared.module";
 import { UsersModule } from "./users/infrastructure/modules/users.module";
 import { MailerModule } from "@nestjs-modules/mailer";
+import { TasksModule } from "./tasks/infrastructure/modules/tasks.module";
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { MailerModule } from "@nestjs-modules/mailer";
     }),
     SharedModule,
     UsersModule,
+    TasksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
