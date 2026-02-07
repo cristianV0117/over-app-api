@@ -58,4 +58,31 @@ export class TasksImplementation implements TasksRepository {
       order: createdTask.order,
     });
   }
+
+  async findAllByUserId(userId: string): Promise<Task[]> {
+    const docs = await this.taskModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .populate<{ status: TaskStatusModel }>("status")
+      .sort({ order: 1, createdAt: 1 })
+      .lean()
+      .exec();
+
+    return docs.map((d) => {
+      const status = d.status as unknown as { _id: Types.ObjectId; name: string } | null;
+      return new Task({
+        id: (d._id as Types.ObjectId).toString(),
+        title: d.title,
+        description: d.description,
+        statusId:
+          status?._id?.toString() ??
+          (typeof d.status === "object" && d.status && "_id" in d.status
+            ? String((d.status as { _id: unknown })._id)
+            : String(d.status)),
+        statusName: status?.name,
+        userId: (d.userId as Types.ObjectId).toString(),
+        dueDate: d.dueDate,
+        order: d.order ?? 0,
+      });
+    });
+  }
 }
