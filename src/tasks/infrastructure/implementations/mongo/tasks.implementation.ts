@@ -14,6 +14,12 @@ import { TaskStoreValueObject } from "src/tasks/domain/valueObjects/task.store.v
 
 const DEFAULT_STATUS_NAME = "To Do";
 
+const PRIORITY_ORDER: Record<string, number> = {
+  high: 0,
+  normal: 1,
+  low: 2,
+};
+
 export class TasksImplementation implements TasksRepository {
   constructor(
     @InjectModel(TaskModel.name)
@@ -45,7 +51,7 @@ export class TasksImplementation implements TasksRepository {
       status: statusId,
       userId: new Types.ObjectId(task.getUserId()),
       dueDate: task.getDueDate(),
-      order: task.getOrder(),
+      priority: task.getPriority(),
     });
 
     return new Task({
@@ -55,7 +61,7 @@ export class TasksImplementation implements TasksRepository {
       statusId: createdTask.status.toString(),
       userId: createdTask.userId.toString(),
       dueDate: createdTask.dueDate,
-      order: createdTask.order,
+      priority: (createdTask.priority ?? "normal") as "low" | "normal" | "high",
     });
   }
 
@@ -63,12 +69,19 @@ export class TasksImplementation implements TasksRepository {
     const docs = await this.taskModel
       .find({ userId: new Types.ObjectId(userId) })
       .populate<{ status: TaskStatusModel }>("status")
-      .sort({ order: 1, createdAt: 1 })
+      .sort({ createdAt: 1 })
       .lean()
       .exec();
 
-    return docs.map((d) => {
+    const withPriority = docs.map((d) => {
+      const priority = (d as { priority?: string }).priority ?? "normal";
+      return { doc: d, priorityOrder: PRIORITY_ORDER[priority] ?? 1 };
+    });
+    withPriority.sort((a, b) => a.priorityOrder - b.priorityOrder);
+
+    return withPriority.map(({ doc: d }) => {
       const status = d.status as unknown as { _id: Types.ObjectId; name: string } | null;
+      const priority = (d as { priority?: string }).priority ?? "normal";
       return new Task({
         id: (d._id as Types.ObjectId).toString(),
         title: d.title,
@@ -81,8 +94,46 @@ export class TasksImplementation implements TasksRepository {
         statusName: status?.name,
         userId: (d.userId as Types.ObjectId).toString(),
         dueDate: d.dueDate,
-        order: d.order ?? 0,
+        priority: priority as "low" | "normal" | "high",
       });
+    });
+  }
+
+  async updateStatus(
+    taskId: string,
+    userId: string,
+    statusId: string
+  ): Promise<Task | null> {
+    const updated = await this.taskModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(taskId),
+          userId: new Types.ObjectId(userId),
+        },
+        { status: new Types.ObjectId(statusId) },
+        { new: true }
+      )
+      .populate<{ status: TaskStatusModel }>("status")
+      .lean()
+      .exec();
+
+    if (!updated) return null;
+
+    const status = updated.status as unknown as {
+      _id: Types.ObjectId;
+      name: string;
+    } | null;
+    const priority = (updated as { priority?: string }).priority ?? "normal";
+
+    return new Task({
+      id: (updated._id as Types.ObjectId).toString(),
+      title: updated.title,
+      description: updated.description,
+      statusId: status?._id?.toString() ?? String(updated.status),
+      statusName: status?.name,
+      userId: (updated.userId as Types.ObjectId).toString(),
+      dueDate: updated.dueDate,
+      priority: priority as "low" | "normal" | "high",
     });
   }
 }

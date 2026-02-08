@@ -17,7 +17,7 @@ export class TasksStoreUseCase {
       task.status,
       task.description,
       task.dueDate,
-      undefined
+      task.priority
     );
     return this.tasksRepository.store(valueObject);
   }

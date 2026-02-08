@@ -1,10 +1,12 @@
+export type TaskPriority = "low" | "normal" | "high";
+
 export type TaskDto = {
-    id?: string;
-    title: string;
-    description?: string;
-    statusId: string;
-    statusName?: string;
-    userId: string;
-    dueDate?: Date;
-    order?: number;
+  id?: string;
+  title: string;
+  description?: string;
+  statusId: string;
+  statusName?: string;
+  userId: string;
+  dueDate?: Date;
+  priority?: TaskPriority;
 };
