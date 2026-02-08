@@ -18,8 +18,8 @@ export class TaskModel {
   @Prop()
   dueDate?: Date;
 
-  @Prop({ default: 0 })
-  order!: number;
+  @Prop({ type: String, enum: ["low", "normal", "high"], default: "normal" })
+  priority!: string;
 }
 
 export type TaskDocument = TaskModel &
