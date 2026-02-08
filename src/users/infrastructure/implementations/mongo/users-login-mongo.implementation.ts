@@ -4,7 +4,10 @@ import {
   UserDocument,
   UserModel,
 } from "src/shared/infrastructure/mongo/schemas/user.schema";
-import { UsersLoginRepository } from "src/users/domain/repositories/users-login.repository";
+import {
+  UsersLoginRepository,
+  UsersProfileUpdate,
+} from "src/users/domain/repositories/users-login.repository";
 import { UsersLoginValueObject } from "src/users/domain/valueObjects/users-login.valueObject";
 import { UsersInvalidCredentialsException } from "src/users/domain/exceptions/users-invalid-credentials.exception";
 import * as bcrypt from "bcrypt";
@@ -17,7 +20,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
   constructor(
     @InjectModel(UserModel.name)
     private readonly userModel: Model<UserDocument>
-  ) {}
+  ) { }
 
   async login(userLogin: UsersLoginValueObject): Promise<User> {
     const user = await this.userModel.findOne({ email: userLogin.getEmail() });
@@ -41,6 +44,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
       email: userLogin.getEmail(),
       password: userLogin.getPassword(),
       name: user.name,
+      avatarUrl: user.avatarUrl,
     });
   }
 
@@ -68,6 +72,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
         name: createdUser.name,
         email: createdUser.email,
         password: createdUser.password,
+        avatarUrl: createdUser.avatarUrl,
         createdAt: createdUser.createdAt,
         updatedAt: createdUser.updatedAt,
       });
@@ -94,8 +99,42 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
       name: user.name,
       email: user.email,
       password: user.password,
+      avatarUrl: user.avatarUrl,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+    });
+  }
+
+  async findById(id: string): Promise<User | null> {
+    const user = await this.userModel.findById(id);
+    if (!user) return null;
+    return new User({
+      id: user.id.toString(),
+      name: user.name,
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
+  }
+
+  async updateProfile(
+    userId: string,
+    data: UsersProfileUpdate
+  ): Promise<User | null> {
+    const updated = await this.userModel.findByIdAndUpdate(
+      userId,
+      { $set: data },
+      { new: true }
+    );
+    if (!updated) return null;
+    return new User({
+      id: updated.id.toString(),
+      name: updated.name,
+      email: updated.email,
+      avatarUrl: updated.avatarUrl,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
     });
   }
 }

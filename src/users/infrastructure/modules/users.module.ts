@@ -18,15 +18,19 @@ import { UsersForgotPasswordController } from "../controllers/users-forgot-passw
 import { MailService } from "src/shared/infrastructure/services/mail.service";
 import { UsersAuthenticatedCookiesImplementation } from "../implementations/cookies/users-authenticated-cookies.implementation";
 import { UsersAuthenticatedUseCase } from "src/users/application/users-authenticated.usecase";
+import { UsersGetProfileUseCase } from "src/users/application/users-get-profile.useCase";
+import { UsersUpdateProfileUseCase } from "src/users/application/users-update-profile.useCase";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import {
   LoginLogModel,
   LoginLogSchema,
 } from "src/shared/infrastructure/mongo/schemas/login-log.schema";
 import { UserLoggedInListener } from "../events/user-logged-in.listener";
+import { StorageModule } from "src/shared/infrastructure/storage/storage.module";
 
 @Module({
   imports: [
+    StorageModule,
     MongooseModule.forFeature([
       { name: UserModel.name, schema: UserSchema },
       {
@@ -53,6 +57,8 @@ import { UserLoggedInListener } from "../events/user-logged-in.listener";
     JwtStrategy,
     JwtAuthGuard,
     UsersLoginUseCase,
+    UsersGetProfileUseCase,
+    UsersUpdateProfileUseCase,
     {
       provide: "UsersLoginRepository",
       useClass: UsersLoginMongoImplementation,
@@ -65,4 +71,4 @@ import { UserLoggedInListener } from "../events/user-logged-in.listener";
     MailService,
   ],
 })
-export class UsersModule {}
+export class UsersModule { }
