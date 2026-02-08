@@ -1,13 +1,14 @@
 import { UserDto } from "./dtos/user-dto";
 
 export class User {
-  constructor(protected props: UserDto) {}
+  constructor(protected props: UserDto) { }
 
   toJSON() {
     return {
       id: this.getId(),
       name: this.getName(),
       email: this.getEmail(),
+      avatarUrl: this.getAvatarUrl(),
       createdAt: this.getCreatedAt(),
       updatedAt: this.getUpdatedAt(),
     };
@@ -23,6 +24,10 @@ export class User {
 
   public getEmail(): string {
     return this.props.email;
+  }
+
+  public getAvatarUrl(): string | null | undefined {
+    return this.props.avatarUrl;
   }
 
   public getCreatedAt(): Date | undefined {

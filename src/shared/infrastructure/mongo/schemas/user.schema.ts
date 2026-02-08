@@ -14,6 +14,9 @@ export class UserModel {
 
   @Prop({ type: Types.ObjectId, ref: "StatusModel", required: true })
   status!: Types.ObjectId;
+
+  @Prop({ type: String, default: null })
+  avatarUrl?: string | null;
 }
 
 export type UserDocument = UserModel &
