@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -45,6 +46,8 @@ import { FinanceRecurringExpensesStoreUseCase } from "src/finance/application/fi
 import { FinanceRecurringExpensesUpdateUseCase } from "src/finance/application/finance-recurring-expenses-update.useCase";
 import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/finance-recurring-expenses-delete.useCase";
 import { FinanceMonthlySummaryUseCase } from "src/finance/application/finance-monthly-summary.useCase";
+import { FinanceLiquidityPutDto } from "../dtos/finance-liquidity-put.dto";
+import { FinanceLiquidityReplaceUseCase } from "src/finance/application/finance-liquidity-replace.useCase";
 
 @Controller("finance")
 export class FinanceController {
@@ -69,8 +72,24 @@ export class FinanceController {
     private readonly recurringExpensesStore: FinanceRecurringExpensesStoreUseCase,
     private readonly recurringExpensesUpdate: FinanceRecurringExpensesUpdateUseCase,
     private readonly recurringExpensesDelete: FinanceRecurringExpensesDeleteUseCase,
-    private readonly monthlySummary: FinanceMonthlySummaryUseCase
+    private readonly monthlySummary: FinanceMonthlySummaryUseCase,
+    private readonly liquidityReplace: FinanceLiquidityReplaceUseCase
   ) {}
+
+  @Put("liquidity")
+  @UseGuards(JwtAuthGuard)
+  async liquidityPut(
+    @Body() body: FinanceLiquidityPutDto,
+    @Req() req: RequestWithUser
+  ) {
+    const accounts = await this.liquidityReplace.execute(req.user.id, body);
+    const total = accounts.reduce((s, a) => s + a.amount, 0);
+    return {
+      currency: "COP" as const,
+      total,
+      accounts,
+    };
+  }
 
   @Get("summary")
   @UseGuards(JwtAuthGuard)

@@ -15,6 +15,11 @@ export type FinanceIncomeCategoryDeleteResult =
   | "not_found"
   | "has_incomes";
 
+export type FinanceLiquidityAccount = {
+  label: string;
+  amount: number;
+};
+
 export interface FinanceLedgerRepository {
   findIncomeCategoriesByUser(userId: string): Promise<IncomeCategory[]>;
   createIncomeCategory(userId: string, name: string): Promise<IncomeCategory>;
@@ -113,4 +118,10 @@ export interface FinanceLedgerRepository {
     }
   ): Promise<FinanceRecurringExpense | null>;
   deleteRecurringExpenseRule(userId: string, id: string): Promise<boolean>;
+
+  getLiquidityAccounts(userId: string): Promise<FinanceLiquidityAccount[]>;
+  replaceLiquidityAccounts(
+    userId: string,
+    accounts: FinanceLiquidityAccount[]
+  ): Promise<FinanceLiquidityAccount[]>;
 }
