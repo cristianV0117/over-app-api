@@ -4,6 +4,7 @@ import {
   FinanceCategoryDeleteResult,
   FinanceIncomeCategoryDeleteResult,
   FinanceLedgerRepository,
+  FinanceLiquidityAccount,
 } from "src/finance/domain/repositories/finance-ledger.repository";
 import { ExpenseCategory } from "src/finance/domain/expense-category";
 import { FinanceExpense } from "src/finance/domain/finance-expense";
@@ -30,6 +31,10 @@ import {
   FinanceRecurringExpenseModel,
   FinanceRecurringExpenseDocument,
 } from "src/shared/infrastructure/mongo/schemas/finance-recurring-expense.schema";
+import {
+  FinanceLiquidityDocument,
+  FinanceLiquidityModel,
+} from "src/shared/infrastructure/mongo/schemas/finance-liquidity.schema";
 
 export const RECURRING_EXPENSE_ID_PREFIX = "recurring:";
 
@@ -50,7 +55,9 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     @InjectModel(FinanceExpenseModel.name)
     private readonly expenseModel: Model<FinanceExpenseDocument>,
     @InjectModel(FinanceRecurringExpenseModel.name)
-    private readonly recurringExpenseModel: Model<FinanceRecurringExpenseDocument>
+    private readonly recurringExpenseModel: Model<FinanceRecurringExpenseDocument>,
+    @InjectModel(FinanceLiquidityModel.name)
+    private readonly liquidityModel: Model<FinanceLiquidityDocument>
   ) {}
 
   async findIncomeCategoriesByUser(userId: string): Promise<IncomeCategory[]> {
@@ -684,5 +691,43 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       occurredAt: raw.occurredAt as Date,
       notes: (raw.notes as string) ?? "",
     });
+  }
+
+  async getLiquidityAccounts(userId: string): Promise<FinanceLiquidityAccount[]> {
+    const doc = await this.liquidityModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .lean()
+      .exec();
+    if (!doc?.accounts?.length) return [];
+    return doc.accounts.map((a) => ({
+      label: a.label,
+      amount: a.amount,
+    }));
+  }
+
+  async replaceLiquidityAccounts(
+    userId: string,
+    accounts: FinanceLiquidityAccount[]
+  ): Promise<FinanceLiquidityAccount[]> {
+    const normalized = accounts
+      .map((a) => ({
+        label: String(a.label ?? "").trim(),
+        amount: Math.max(0, Number(a.amount) || 0),
+      }))
+      .filter((a) => a.label.length > 0);
+
+    const doc = await this.liquidityModel
+      .findOneAndUpdate(
+        { userId: new Types.ObjectId(userId) },
+        { $set: { accounts: normalized } },
+        { upsert: true, new: true }
+      )
+      .lean()
+      .exec();
+
+    return (doc?.accounts ?? []).map((a) => ({
+      label: a.label,
+      amount: a.amount,
+    }));
   }
 }

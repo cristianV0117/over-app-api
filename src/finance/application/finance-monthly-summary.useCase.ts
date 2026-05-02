@@ -31,6 +31,11 @@ export type FinanceMonthlySummaryResult = {
     recurringRuleId?: string;
   }>;
   remaining: number;
+  liquidity: {
+    currency: "COP";
+    total: number;
+    accounts: { label: string; amount: number }[];
+  };
 };
 
 @Injectable()
@@ -45,12 +50,14 @@ export class FinanceMonthlySummaryUseCase {
     year: number,
     month: number
   ): Promise<FinanceMonthlySummaryResult> {
-    const [incomes, expenses, incomeCats, expenseCats] = await Promise.all([
-      this.ledger.findIncomesForMonth(userId, year, month),
-      this.ledger.findExpensesForMonth(userId, year, month),
-      this.ledger.findIncomeCategoriesByUser(userId),
-      this.ledger.findExpenseCategoriesByUser(userId),
-    ]);
+    const [incomes, expenses, incomeCats, expenseCats, liquidityAccounts] =
+      await Promise.all([
+        this.ledger.findIncomesForMonth(userId, year, month),
+        this.ledger.findExpensesForMonth(userId, year, month),
+        this.ledger.findIncomeCategoriesByUser(userId),
+        this.ledger.findExpenseCategoriesByUser(userId),
+        this.ledger.getLiquidityAccounts(userId),
+      ]);
 
     const incomeCatMap = new Map(incomeCats.map((c) => [c.id, c.name]));
     const expenseCatMap = new Map(expenseCats.map((c) => [c.id, c.name]));
@@ -97,6 +104,11 @@ export class FinanceMonthlySummaryUseCase {
         });
     }
 
+    const liquidityTotal = liquidityAccounts.reduce(
+      (s, a) => s + a.amount,
+      0
+    );
+
     return {
       year,
       month,
@@ -112,6 +124,11 @@ export class FinanceMonthlySummaryUseCase {
       ),
       expenses: expenses.map((x) => x.toJSON()),
       remaining: income - totalExpenses,
+      liquidity: {
+        currency: "COP",
+        total: liquidityTotal,
+        accounts: liquidityAccounts,
+      },
     };
   }
 }

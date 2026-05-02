@@ -21,6 +21,10 @@ import {
   FinanceRecurringExpenseModel,
   FinanceRecurringExpenseSchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-recurring-expense.schema";
+import {
+  FinanceLiquidityModel,
+  FinanceLiquiditySchema,
+} from "src/shared/infrastructure/mongo/schemas/finance-liquidity.schema";
 import { FinanceController } from "../controllers/finance.controller";
 import { FinanceLedgerImplementation } from "../implementations/mongo/finance-ledger.implementation";
 import { JwtStrategy } from "src/shared/infrastructure/strategies/jwt.strategy";
@@ -42,6 +46,7 @@ import { FinanceExpensesStoreUseCase } from "src/finance/application/finance-exp
 import { FinanceExpensesUpdateUseCase } from "src/finance/application/finance-expenses-update.useCase";
 import { FinanceExpensesDeleteUseCase } from "src/finance/application/finance-expenses-delete.useCase";
 import { FinanceMonthlySummaryUseCase } from "src/finance/application/finance-monthly-summary.useCase";
+import { FinanceLiquidityReplaceUseCase } from "src/finance/application/finance-liquidity-replace.useCase";
 import { FinanceRecurringExpensesIndexUseCase } from "src/finance/application/finance-recurring-expenses-index.useCase";
 import { FinanceRecurringExpensesStoreUseCase } from "src/finance/application/finance-recurring-expenses-store.useCase";
 import { FinanceRecurringExpensesUpdateUseCase } from "src/finance/application/finance-recurring-expenses-update.useCase";
@@ -63,6 +68,10 @@ import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/f
       {
         name: FinanceRecurringExpenseModel.name,
         schema: FinanceRecurringExpenseSchema,
+      },
+      {
+        name: FinanceLiquidityModel.name,
+        schema: FinanceLiquiditySchema,
       },
     ]),
     JwtModule.register({
@@ -99,6 +108,7 @@ import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/f
     FinanceRecurringExpensesUpdateUseCase,
     FinanceRecurringExpensesDeleteUseCase,
     FinanceMonthlySummaryUseCase,
+    FinanceLiquidityReplaceUseCase,
   ],
 })
 export class FinanceModule {}
