@@ -4,6 +4,10 @@ import {
   UserModel,
   UserSchema,
 } from "src/shared/infrastructure/mongo/schemas/user.schema";
+import {
+  StatusModel,
+  StatusSchema,
+} from "src/shared/infrastructure/mongo/schemas/status.schema";
 import { UsersLoginController } from "../controllers/users-login.controller";
 import { UsersLoginUseCase } from "src/users/application/users-login.usecase";
 import { UsersLoginMongoImplementation } from "../implementations/mongo/users-login-mongo.implementation";
@@ -15,6 +19,8 @@ import { GoogleStrategy } from "src/shared/infrastructure/strategies/google.stra
 import { UsersLoginGoogleController } from "../controllers/users-login-google.controller";
 import { UsersLogoutController } from "../controllers/users-logout.controller";
 import { UsersForgotPasswordController } from "../controllers/users-forgot-password.controller";
+import { UsersRegisterController } from "../controllers/users-register.controller";
+import { UsersRegisterUseCase } from "src/users/application/users-register.usecase";
 import { MailService } from "src/shared/infrastructure/services/mail.service";
 import { UsersAuthenticatedCookiesImplementation } from "../implementations/cookies/users-authenticated-cookies.implementation";
 import { UsersAuthenticatedUseCase } from "src/users/application/users-authenticated.usecase";
@@ -33,6 +39,7 @@ import { StorageModule } from "src/shared/infrastructure/storage/storage.module"
     StorageModule,
     MongooseModule.forFeature([
       { name: UserModel.name, schema: UserSchema },
+      { name: StatusModel.name, schema: StatusSchema },
       {
         name: LoginLogModel.name,
         schema: LoginLogSchema,
@@ -50,6 +57,7 @@ import { StorageModule } from "src/shared/infrastructure/storage/storage.module"
     UsersMeController,
     UsersLogoutController,
     UsersForgotPasswordController,
+    UsersRegisterController,
   ],
   providers: [
     UserLoggedInListener,
@@ -57,6 +65,7 @@ import { StorageModule } from "src/shared/infrastructure/storage/storage.module"
     JwtStrategy,
     JwtAuthGuard,
     UsersLoginUseCase,
+    UsersRegisterUseCase,
     UsersGetProfileUseCase,
     UsersUpdateProfileUseCase,
     {
