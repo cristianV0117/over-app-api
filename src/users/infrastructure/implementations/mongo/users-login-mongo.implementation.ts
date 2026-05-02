@@ -5,6 +5,11 @@ import {
   UserModel,
 } from "src/shared/infrastructure/mongo/schemas/user.schema";
 import {
+  StatusDocument,
+  StatusModel,
+} from "src/shared/infrastructure/mongo/schemas/status.schema";
+import { Exceptions } from "src/shared/domain/exceptions/exceptions";
+import {
   UsersLoginRepository,
   UsersProfileUpdate,
 } from "src/users/domain/repositories/users-login.repository";
@@ -19,7 +24,9 @@ import { UserNotFoundException } from "src/users/domain/exceptions/user-not-foun
 export class UsersLoginMongoImplementation implements UsersLoginRepository {
   constructor(
     @InjectModel(UserModel.name)
-    private readonly userModel: Model<UserDocument>
+    private readonly userModel: Model<UserDocument>,
+    @InjectModel(StatusModel.name)
+    private readonly statusModel: Model<StatusDocument>
   ) { }
 
   async login(userLogin: UsersLoginValueObject): Promise<User> {
@@ -60,11 +67,17 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
 
   async store(userStore: UsersStoreValueObject): Promise<User> {
     try {
+      const activeStatus = await this.statusModel.findOne({ name: "active" });
+      if (!activeStatus) {
+        throw new Exceptions(
+          "El estado de usuario activo no está configurado."
+        );
+      }
       const createdUser = await this.userModel.create({
         name: userStore.getName(),
         email: userStore.getEmail(),
         password: userStore.getPassword(),
-        status: userStore.getStatus(),
+        status: activeStatus._id,
       });
 
       return new User({
