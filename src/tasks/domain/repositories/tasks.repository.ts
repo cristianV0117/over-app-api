@@ -19,4 +19,5 @@ export interface TasksRepository {
       priority?: string;
     }
   ): Promise<Task | null>;
+  deleteByUser(taskId: string, userId: string): Promise<boolean>;
 }

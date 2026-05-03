@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -15,6 +16,7 @@ import { TasksStoreUseCase } from "src/tasks/application/tasks.store.useCase";
 import { TasksIndexUseCase } from "src/tasks/application/tasks.index.useCase";
 import { TasksUpdateStatusUseCase } from "src/tasks/application/tasks-update-status.useCase";
 import { TasksPatchUseCase } from "src/tasks/application/tasks-patch.useCase";
+import { TasksDeleteUseCase } from "src/tasks/application/tasks-delete.useCase";
 import { TaskPatchDTO } from "../dtos/task-patch.dto";
 import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
 import { RequestWithUser } from "src/shared/infrastructure/types/request-with-user.type";
@@ -25,7 +27,8 @@ export class TasksStoreController {
     private readonly tasksStoreUseCase: TasksStoreUseCase,
     private readonly tasksIndexUseCase: TasksIndexUseCase,
     private readonly tasksUpdateStatusUseCase: TasksUpdateStatusUseCase,
-    private readonly tasksPatchUseCase: TasksPatchUseCase
+    private readonly tasksPatchUseCase: TasksPatchUseCase,
+    private readonly tasksDeleteUseCase: TasksDeleteUseCase
   ) { }
 
   @Get()
@@ -67,5 +70,13 @@ export class TasksStoreController {
   ) {
     const task = await this.tasksPatchUseCase.execute(taskId, req.user.id, body);
     return task.toJSON();
+  }
+
+  @Delete(":id")
+  @UseGuards(JwtAuthGuard)
+  async remove(@Param("id") taskId: string, @Req() req: RequestWithUser) {
+    const ok = await this.tasksDeleteUseCase.execute(taskId, req.user.id);
+    if (!ok) throw new NotFoundException("Tarea no encontrada");
+    return { deleted: true };
   }
 }

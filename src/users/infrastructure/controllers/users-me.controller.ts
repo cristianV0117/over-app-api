@@ -31,7 +31,20 @@ export class UsersMeController {
   async getProfile(@Req() req: RequestWithUser) {
     const user = await this.usersGetProfileUseCase.execute(req.user.id);
     if (!user) throw new NotFoundException("Usuario no encontrado");
-    return user.toJSON();
+    const json = user.toJSON();
+    const impId = req.user.impersonatorId;
+    if (!impId) {
+      return json;
+    }
+    const admin = await this.usersGetProfileUseCase.execute(impId);
+    return {
+      ...json,
+      impersonation: {
+        impersonatorId: impId,
+        impersonatorName: admin?.getName() ?? "Admin",
+        impersonatorEmail: admin?.getEmail() ?? null,
+      },
+    };
   }
 
   @Patch()

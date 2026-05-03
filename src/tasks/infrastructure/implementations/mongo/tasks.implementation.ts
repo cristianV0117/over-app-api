@@ -217,4 +217,12 @@ export class TasksImplementation implements TasksRepository {
       priority: priority as "low" | "normal" | "high",
     });
   }
+
+  async deleteByUser(taskId: string, userId: string): Promise<boolean> {
+    const res = await this.taskModel.deleteOne({
+      _id: new Types.ObjectId(taskId),
+      userId: new Types.ObjectId(userId),
+    });
+    return res.deletedCount === 1;
+  }
 }
