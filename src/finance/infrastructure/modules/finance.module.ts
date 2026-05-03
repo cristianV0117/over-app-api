@@ -22,6 +22,10 @@ import {
   FinanceRecurringExpenseSchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-recurring-expense.schema";
 import {
+  FinanceRecurringExpensePaidModel,
+  FinanceRecurringExpensePaidSchema,
+} from "src/shared/infrastructure/mongo/schemas/finance-recurring-expense-paid.schema";
+import {
   FinanceLiquidityModel,
   FinanceLiquiditySchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-liquidity.schema";
@@ -68,6 +72,10 @@ import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/f
       {
         name: FinanceRecurringExpenseModel.name,
         schema: FinanceRecurringExpenseSchema,
+      },
+      {
+        name: FinanceRecurringExpensePaidModel.name,
+        schema: FinanceRecurringExpensePaidSchema,
       },
       {
         name: FinanceLiquidityModel.name,

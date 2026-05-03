@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsBoolean,
   MaxLength,
   Min,
 } from "class-validator";
@@ -29,4 +30,8 @@ export class FinanceExpenseUpdateDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  paid?: boolean;
 }

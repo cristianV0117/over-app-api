@@ -10,4 +10,5 @@ export type FinanceExpenseProps = {
   label?: string;
   isRecurring?: boolean;
   recurringRuleId?: string;
+  paid?: boolean;
 };

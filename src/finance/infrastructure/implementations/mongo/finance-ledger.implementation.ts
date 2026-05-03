@@ -35,6 +35,10 @@ import {
   FinanceLiquidityDocument,
   FinanceLiquidityModel,
 } from "src/shared/infrastructure/mongo/schemas/finance-liquidity.schema";
+import {
+  FinanceRecurringExpensePaidDocument,
+  FinanceRecurringExpensePaidModel,
+} from "src/shared/infrastructure/mongo/schemas/finance-recurring-expense-paid.schema";
 
 export const RECURRING_EXPENSE_ID_PREFIX = "recurring:";
 
@@ -57,7 +61,9 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     @InjectModel(FinanceRecurringExpenseModel.name)
     private readonly recurringExpenseModel: Model<FinanceRecurringExpenseDocument>,
     @InjectModel(FinanceLiquidityModel.name)
-    private readonly liquidityModel: Model<FinanceLiquidityDocument>
+    private readonly liquidityModel: Model<FinanceLiquidityDocument>,
+    @InjectModel(FinanceRecurringExpensePaidModel.name)
+    private readonly recurringExpensePaidModel: Model<FinanceRecurringExpensePaidDocument>
   ) {}
 
   async findIncomeCategoriesByUser(userId: string): Promise<IncomeCategory[]> {
@@ -340,6 +346,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       amount,
       occurredAt,
       notes: notes?.trim() ?? "",
+      paid: false,
     });
     const populated = await this.expenseModel
       .findById(created._id)
@@ -372,12 +379,37 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       .populate<{ categoryId: FinanceExpenseCategoryModel }>("categoryId")
       .lean()
       .exec();
+
+    const ruleIdList = recurringDocs.map(
+      (r) => r._id as Types.ObjectId
+    );
+    const paidMarks =
+      ruleIdList.length === 0
+        ? []
+        : await this.recurringExpensePaidModel
+            .find({
+              userId: new Types.ObjectId(userId),
+              year,
+              month,
+              recurringRuleId: { $in: ruleIdList },
+            })
+            .lean()
+            .exec();
+    const paidByRule = new Map<string, boolean>();
+    for (const m of paidMarks) {
+      paidByRule.set(
+        (m.recurringRuleId as Types.ObjectId).toString(),
+        !!m.paid
+      );
+    }
+
     const synthetic = recurringDocs.map((r) =>
       this.syntheticExpenseFromRecurringRule(
         r as unknown as Record<string, unknown>,
         userId,
         year,
-        month
+        month,
+        paidByRule.get((r._id as Types.ObjectId).toString()) ?? false
       )
     );
     return [...mappedReal, ...synthetic].sort(
@@ -394,6 +426,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       amount?: number;
       occurredAt?: Date;
       notes?: string;
+      paid?: boolean;
     }
   ): Promise<FinanceExpense | null> {
     const uid = new Types.ObjectId(userId);
@@ -413,6 +446,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     if (patch.amount !== undefined) $set.amount = patch.amount;
     if (patch.occurredAt !== undefined) $set.occurredAt = patch.occurredAt;
     if (patch.notes !== undefined) $set.notes = patch.notes.trim();
+    if (patch.paid !== undefined) $set.paid = patch.paid;
     if (Object.keys($set).length === 0) {
       const existing = await this.expenseModel
         .findOne({ _id: new Types.ObjectId(id), userId: uid })
@@ -568,7 +602,8 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     rule: Record<string, unknown>,
     userId: string,
     year: number,
-    month: number
+    month: number,
+    paid: boolean
   ): FinanceExpense {
     const ruleId = (rule._id as Types.ObjectId).toString();
     const catRaw = rule.categoryId;
@@ -602,6 +637,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       label: label || undefined,
       isRecurring: true,
       recurringRuleId: ruleId,
+      paid,
     });
   }
 
@@ -690,6 +726,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       amount: raw.amount as number,
       occurredAt: raw.occurredAt as Date,
       notes: (raw.notes as string) ?? "",
+      paid: (raw.paid as boolean) ?? false,
     });
   }
 
@@ -729,5 +766,33 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       label: a.label,
       amount: a.amount,
     }));
+  }
+
+  async setRecurringExpensePaidForMonth(
+    userId: string,
+    recurringRuleId: string,
+    year: number,
+    month: number,
+    paid: boolean
+  ): Promise<void> {
+    const uid = new Types.ObjectId(userId);
+    const rid = new Types.ObjectId(recurringRuleId);
+    const rule = await this.recurringExpenseModel
+      .findOne({ _id: rid, userId: uid })
+      .lean()
+      .exec();
+    if (!rule) {
+      throw new Error("Regla de gasto recurrente no encontrada");
+    }
+    await this.recurringExpensePaidModel.findOneAndUpdate(
+      {
+        userId: uid,
+        recurringRuleId: rid,
+        year,
+        month,
+      },
+      { $set: { paid: !!paid } },
+      { upsert: true }
+    );
   }
 }

@@ -87,6 +87,7 @@ export interface FinanceLedgerRepository {
       amount?: number;
       occurredAt?: Date;
       notes?: string;
+      paid?: boolean;
     }
   ): Promise<FinanceExpense | null>;
   deleteExpense(userId: string, id: string): Promise<boolean>;
@@ -124,4 +125,12 @@ export interface FinanceLedgerRepository {
     userId: string,
     accounts: FinanceLiquidityAccount[]
   ): Promise<FinanceLiquidityAccount[]>;
+
+  setRecurringExpensePaidForMonth(
+    userId: string,
+    recurringRuleId: string,
+    year: number,
+    month: number,
+    paid: boolean
+  ): Promise<void>;
 }

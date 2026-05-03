@@ -12,6 +12,7 @@ import { Exceptions } from "src/shared/domain/exceptions/exceptions";
 import {
   UsersLoginRepository,
   UsersProfileUpdate,
+  UsersAdminListItem,
 } from "src/users/domain/repositories/users-login.repository";
 import { UsersLoginValueObject } from "src/users/domain/valueObjects/users-login.valueObject";
 import { UsersInvalidCredentialsException } from "src/users/domain/exceptions/users-invalid-credentials.exception";
@@ -20,6 +21,10 @@ import { User } from "src/users/domain/user";
 import { UsersStoreValueObject } from "src/users/domain/valueObjects/users-store.valueObjects";
 import { UsersEmailAlreadyExistsException } from "src/users/domain/exceptions/users-email-already-exists.exception";
 import { UserNotFoundException } from "src/users/domain/exceptions/user-not-found.exception";
+
+function userRoleFromDoc(role: string | undefined): "admin" | "user" {
+  return role === "admin" ? "admin" : "user";
+}
 
 export class UsersLoginMongoImplementation implements UsersLoginRepository {
   constructor(
@@ -52,6 +57,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
       password: userLogin.getPassword(),
       name: user.name,
       avatarUrl: user.avatarUrl,
+      role: userRoleFromDoc(user.role),
     });
   }
 
@@ -78,6 +84,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
         email: userStore.getEmail(),
         password: userStore.getPassword(),
         status: activeStatus._id,
+        role: "user",
       });
 
       return new User({
@@ -86,6 +93,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
         email: createdUser.email,
         password: createdUser.password,
         avatarUrl: createdUser.avatarUrl,
+        role: userRoleFromDoc(createdUser.role),
         createdAt: createdUser.createdAt,
         updatedAt: createdUser.updatedAt,
       });
@@ -113,6 +121,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
       email: user.email,
       password: user.password,
       avatarUrl: user.avatarUrl,
+      role: userRoleFromDoc(user.role),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     });
@@ -126,6 +135,7 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
       name: user.name,
       email: user.email,
       avatarUrl: user.avatarUrl,
+      role: userRoleFromDoc(user.role),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     });
@@ -146,8 +156,26 @@ export class UsersLoginMongoImplementation implements UsersLoginRepository {
       name: updated.name,
       email: updated.email,
       avatarUrl: updated.avatarUrl,
+      role: userRoleFromDoc(updated.role),
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });
+  }
+
+  async listUsersForAdmin(): Promise<UsersAdminListItem[]> {
+    const docs = await this.userModel
+      .find()
+      .select("name email role avatarUrl createdAt")
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+    return docs.map((d) => ({
+      id: (d._id as { toString: () => string }).toString(),
+      name: d.name,
+      email: d.email,
+      role: userRoleFromDoc(d.role as string | undefined),
+      avatarUrl: d.avatarUrl ?? null,
+      createdAt: d.createdAt,
+    }));
   }
 }

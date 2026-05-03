@@ -23,6 +23,7 @@ export class FinanceExpense {
       label: this.props.label,
       isRecurring: this.props.isRecurring ?? false,
       recurringRuleId: this.props.recurringRuleId,
+      paid: this.props.paid ?? false,
     };
   }
 }
