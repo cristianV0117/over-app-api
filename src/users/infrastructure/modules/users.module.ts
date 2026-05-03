@@ -23,6 +23,8 @@ import { UsersRegisterController } from "../controllers/users-register.controlle
 import { UsersRegisterUseCase } from "src/users/application/users-register.usecase";
 import { UsersAdminController } from "../controllers/users-admin.controller";
 import { UsersAdminListUseCase } from "src/users/application/users-admin-list.useCase";
+import { UsersAdminImpersonateUseCase } from "src/users/application/users-admin-impersonate.useCase";
+import { UsersAdminStopImpersonateUseCase } from "src/users/application/users-admin-stop-impersonate.useCase";
 import { AdminGuard } from "src/shared/infrastructure/guards/admin.guard";
 import { MailService } from "src/shared/infrastructure/services/mail.service";
 import { UsersAuthenticatedCookiesImplementation } from "../implementations/cookies/users-authenticated-cookies.implementation";
@@ -72,6 +74,8 @@ import { StorageModule } from "src/shared/infrastructure/storage/storage.module"
     UsersLoginUseCase,
     UsersRegisterUseCase,
     UsersAdminListUseCase,
+    UsersAdminImpersonateUseCase,
+    UsersAdminStopImpersonateUseCase,
     UsersGetProfileUseCase,
     UsersUpdateProfileUseCase,
     {

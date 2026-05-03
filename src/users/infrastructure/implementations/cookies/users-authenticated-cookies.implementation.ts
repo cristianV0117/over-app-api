@@ -38,4 +38,27 @@ export class UsersAuthenticatedCookiesImplementation
       })
     );
   }
+
+  impersonated(user: User, impersonatorId: string): Promise<UserLogin> {
+    const token = this.jwtService.sign(
+      {
+        sub: user.getId(),
+        email: user.getEmail(),
+        name: user.getName(),
+        role: user.getRole(),
+        imp: impersonatorId,
+      },
+      { secret: process.env.JWT_SECRET || "secretKey" }
+    );
+    return Promise.resolve(
+      new UserLogin({
+        id: user.getId(),
+        email: user.getEmail(),
+        token: token,
+        password: "",
+        name: user.getName(),
+        role: user.getRole(),
+      })
+    );
+  }
 }

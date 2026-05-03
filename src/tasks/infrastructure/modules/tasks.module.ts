@@ -12,6 +12,7 @@ import { TasksStoreUseCase } from "src/tasks/application/tasks.store.useCase";
 import { TasksIndexUseCase } from "src/tasks/application/tasks.index.useCase";
 import { TasksUpdateStatusUseCase } from "src/tasks/application/tasks-update-status.useCase";
 import { TasksPatchUseCase } from "src/tasks/application/tasks-patch.useCase";
+import { TasksDeleteUseCase } from "src/tasks/application/tasks-delete.useCase";
 import { TasksImplementation } from "../implementations/mongo/tasks.implementation";
 import { JwtStrategy } from "src/shared/infrastructure/strategies/jwt.strategy";
 import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
@@ -35,6 +36,7 @@ import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
     TasksIndexUseCase,
     TasksUpdateStatusUseCase,
     TasksPatchUseCase,
+    TasksDeleteUseCase,
     {
       provide: "TasksRepository",
       useClass: TasksImplementation,
