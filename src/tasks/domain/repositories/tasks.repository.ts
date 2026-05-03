@@ -9,4 +9,14 @@ export interface TasksRepository {
     userId: string,
     statusId: string
   ): Promise<Task | null>;
+  updateFields(
+    taskId: string,
+    userId: string,
+    patch: {
+      title?: string;
+      description?: string;
+      dueDate?: Date;
+      priority?: string;
+    }
+  ): Promise<Task | null>;
 }

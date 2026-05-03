@@ -7,6 +7,15 @@ export interface UsersProfileUpdate {
   avatarUrl?: string | null;
 }
 
+export type UsersAdminListItem = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl?: string | null;
+  createdAt?: Date;
+};
+
 export interface UsersLoginRepository {
   login(userLogin: UsersLoginValueObject): Promise<User>;
   ensureShow(email: string): Promise<boolean>;
@@ -14,4 +23,5 @@ export interface UsersLoginRepository {
   show(email: string): Promise<User>;
   findById(id: string): Promise<User | null>;
   updateProfile(userId: string, data: UsersProfileUpdate): Promise<User | null>;
+  listUsersForAdmin(): Promise<UsersAdminListItem[]>;
 }

@@ -1,9 +1,12 @@
+export type UserRole = "admin" | "user";
+
 export type UserDto = {
   id?: string;
   name: string;
   email: string;
   password?: string;
   avatarUrl?: string | null;
+  role?: UserRole;
   createdAt?: Date;
   updatedAt?: Date;
 };

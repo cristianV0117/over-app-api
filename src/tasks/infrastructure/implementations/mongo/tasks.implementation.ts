@@ -136,4 +136,85 @@ export class TasksImplementation implements TasksRepository {
       priority: priority as "low" | "normal" | "high",
     });
   }
+
+  async updateFields(
+    taskId: string,
+    userId: string,
+    patch: {
+      title?: string;
+      description?: string;
+      dueDate?: Date;
+      priority?: string;
+    }
+  ): Promise<Task | null> {
+    const $set: Record<string, unknown> = {};
+    if (patch.title !== undefined) $set.title = patch.title.trim();
+    if (patch.description !== undefined)
+      $set.description = patch.description.trim();
+    if (patch.dueDate !== undefined) $set.dueDate = patch.dueDate;
+    if (patch.priority !== undefined) $set.priority = patch.priority;
+    if (Object.keys($set).length === 0) {
+      const existing = await this.taskModel
+        .findOne({
+          _id: new Types.ObjectId(taskId),
+          userId: new Types.ObjectId(userId),
+        })
+        .populate<{ status: TaskStatusModel }>("status")
+        .lean()
+        .exec();
+      if (!existing) return null;
+      const status = existing.status as unknown as {
+        _id: Types.ObjectId;
+        name: string;
+      } | null;
+      const pr = (existing as { priority?: string }).priority ?? "normal";
+      return new Task({
+        id: (existing._id as Types.ObjectId).toString(),
+        title: existing.title,
+        description: existing.description,
+        statusId:
+          status?._id?.toString() ??
+          String(
+            typeof existing.status === "object" && existing.status && "_id" in existing.status
+              ? (existing.status as { _id: unknown })._id
+              : existing.status
+          ),
+        statusName: status?.name,
+        userId: (existing.userId as Types.ObjectId).toString(),
+        dueDate: existing.dueDate,
+        priority: pr as "low" | "normal" | "high",
+      });
+    }
+    const updated = await this.taskModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(taskId),
+          userId: new Types.ObjectId(userId),
+        },
+        { $set },
+        { new: true }
+      )
+      .populate<{ status: TaskStatusModel }>("status")
+      .lean()
+      .exec();
+
+    if (!updated) return null;
+
+    const status = updated.status as unknown as {
+      _id: Types.ObjectId;
+      name: string;
+    } | null;
+    const priority = (updated as { priority?: string }).priority ?? "normal";
+
+    return new Task({
+      id: (updated._id as Types.ObjectId).toString(),
+      title: updated.title,
+      description: updated.description,
+      statusId: status?._id?.toString() ?? String(updated.status),
+      statusName: status?.name,
+      userId: (updated.userId as Types.ObjectId).toString(),
+      dueDate: updated.dueDate,
+      priority: priority as "low" | "normal" | "high",
+    });
+  }
 }

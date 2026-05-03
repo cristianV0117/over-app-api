@@ -21,6 +21,9 @@ import { UsersLogoutController } from "../controllers/users-logout.controller";
 import { UsersForgotPasswordController } from "../controllers/users-forgot-password.controller";
 import { UsersRegisterController } from "../controllers/users-register.controller";
 import { UsersRegisterUseCase } from "src/users/application/users-register.usecase";
+import { UsersAdminController } from "../controllers/users-admin.controller";
+import { UsersAdminListUseCase } from "src/users/application/users-admin-list.useCase";
+import { AdminGuard } from "src/shared/infrastructure/guards/admin.guard";
 import { MailService } from "src/shared/infrastructure/services/mail.service";
 import { UsersAuthenticatedCookiesImplementation } from "../implementations/cookies/users-authenticated-cookies.implementation";
 import { UsersAuthenticatedUseCase } from "src/users/application/users-authenticated.usecase";
@@ -58,14 +61,17 @@ import { StorageModule } from "src/shared/infrastructure/storage/storage.module"
     UsersLogoutController,
     UsersForgotPasswordController,
     UsersRegisterController,
+    UsersAdminController,
   ],
   providers: [
     UserLoggedInListener,
     GoogleStrategy,
     JwtStrategy,
     JwtAuthGuard,
+    AdminGuard,
     UsersLoginUseCase,
     UsersRegisterUseCase,
+    UsersAdminListUseCase,
     UsersGetProfileUseCase,
     UsersUpdateProfileUseCase,
     {

@@ -23,15 +23,18 @@ export class UsersAuthenticatedCookiesImplementation
         sub: user.getId(),
         email: user.getEmail(),
         name: user.getName(),
+        role: user.getRole(),
       },
       { secret: process.env.JWT_SECRET || "secretKey" }
     );
     return Promise.resolve(
       new UserLogin({
+        id: user.getId(),
         email: user.getEmail(),
         token: token,
         password: "",
         name: user.getName(),
+        role: user.getRole(),
       })
     );
   }

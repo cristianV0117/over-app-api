@@ -251,10 +251,19 @@ export class FinanceController {
   @UseGuards(JwtAuthGuard)
   async expensesPatch(
     @Param("id") id: string,
+    @Req() req: RequestWithUser,
     @Body() body: FinanceExpenseUpdateDto,
-    @Req() req: RequestWithUser
+    @Query("year") yearStr?: string,
+    @Query("month") monthStr?: string
   ) {
-    const e = await this.expensesUpdate.execute(id, body, req.user.id);
+    const ctx =
+      yearStr !== undefined &&
+      monthStr !== undefined &&
+      yearStr !== "" &&
+      monthStr !== ""
+        ? { year: Number(yearStr), month: Number(monthStr) }
+        : undefined;
+    const e = await this.expensesUpdate.execute(id, body, req.user.id, ctx);
     return e.toJSON();
   }
 

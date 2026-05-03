@@ -1,4 +1,9 @@
 // src/shared/infrastructure/mongo/seeders/user.seeder.ts
+import { config as loadEnv } from "dotenv";
+import { resolve } from "path";
+
+loadEnv({ path: resolve(process.cwd(), ".env") });
+
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "../../../../app.module";
 import { getModelToken } from "@nestjs/mongoose";
@@ -18,20 +23,29 @@ async function bootstrap() {
     return;
   }
 
+  await userModel.updateMany(
+    { $or: [{ role: { $exists: false } }, { role: null }] },
+    { $set: { role: "user" } }
+  );
+
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || "admin@example.com";
+  await userModel.updateOne(
+    { email: adminEmail },
+    { $set: { role: "admin" } }
+  );
+
   const existing = await userModel.countDocuments();
   if (existing === 0) {
     await userModel.insertMany([
       {
         name: "admin",
-        email: "admin@example.com",
+        email: adminEmail,
         password:
           "$2a$12$UIdyoVzM5ZxQsolXzzg3AeUvikpTId2vJ6nxWcNxVBLH28ycOe5Xi",
         status: status._id,
+        role: "admin",
       },
     ]);
-    console.log("✅ Usuarios sembrados correctamente.");
-  } else {
-    console.log("⚠️ Ya existen usuarios.");
   }
 
   await app.close();

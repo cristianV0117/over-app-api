@@ -22,6 +22,9 @@ export class FinanceExpenseModel {
 
   @Prop({ default: "" })
   notes!: string;
+
+  @Prop({ default: false })
+  paid!: boolean;
 }
 
 export type FinanceExpenseDocument = FinanceExpenseModel &

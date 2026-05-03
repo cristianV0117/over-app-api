@@ -17,6 +17,10 @@ export class UserModel {
 
   @Prop({ type: String, default: null })
   avatarUrl?: string | null;
+
+  /** admin | user */
+  @Prop({ type: String, enum: ["admin", "user"], default: "user" })
+  role!: string;
 }
 
 export type UserDocument = UserModel &

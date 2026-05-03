@@ -1,4 +1,4 @@
-import { UserDto } from "./dtos/user-dto";
+import { UserDto, UserRole } from "./dtos/user-dto";
 
 export class User {
   constructor(protected props: UserDto) { }
@@ -9,6 +9,7 @@ export class User {
       name: this.getName(),
       email: this.getEmail(),
       avatarUrl: this.getAvatarUrl(),
+      role: this.getRole(),
       createdAt: this.getCreatedAt(),
       updatedAt: this.getUpdatedAt(),
     };
@@ -28,6 +29,10 @@ export class User {
 
   public getAvatarUrl(): string | null | undefined {
     return this.props.avatarUrl;
+  }
+
+  public getRole(): UserRole {
+    return this.props.role ?? "user";
   }
 
   public getCreatedAt(): Date | undefined {
