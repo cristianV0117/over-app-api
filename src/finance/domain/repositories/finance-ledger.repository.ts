@@ -1,6 +1,7 @@
 import { ExpenseCategory } from "../expense-category";
 import { FinanceExpense } from "../finance-expense";
 import { FinanceRecurringExpense } from "../finance-recurring-expense";
+import { FinanceRecurringIncome } from "../finance-recurring-income";
 import { IncomeCategory } from "../income-category";
 import { FinanceIncomeLine } from "../finance-income-line";
 
@@ -13,7 +14,8 @@ export type FinanceCategoryDeleteResult =
 export type FinanceIncomeCategoryDeleteResult =
   | "deleted"
   | "not_found"
-  | "has_incomes";
+  | "has_incomes"
+  | "has_recurring";
 
 export type FinanceLiquidityAccount = {
   label: string;
@@ -52,6 +54,7 @@ export interface FinanceLedgerRepository {
       amount?: number;
       receivedAt?: Date;
       notes?: string;
+      received?: boolean;
     }
   ): Promise<FinanceIncomeLine | null>;
   deleteIncome(userId: string, id: string): Promise<boolean>;
@@ -132,5 +135,41 @@ export interface FinanceLedgerRepository {
     year: number,
     month: number,
     paid: boolean
+  ): Promise<void>;
+
+  findRecurringIncomeRulesByUser(
+    userId: string
+  ): Promise<FinanceRecurringIncome[]>;
+  createRecurringIncomeRule(
+    userId: string,
+    data: {
+      categoryId: string;
+      amount: number;
+      dayOfMonth: number;
+      label?: string;
+      notes?: string;
+      isActive?: boolean;
+    }
+  ): Promise<FinanceRecurringIncome>;
+  updateRecurringIncomeRule(
+    userId: string,
+    id: string,
+    patch: {
+      categoryId?: string;
+      amount?: number;
+      dayOfMonth?: number;
+      label?: string;
+      notes?: string;
+      isActive?: boolean;
+    }
+  ): Promise<FinanceRecurringIncome | null>;
+  deleteRecurringIncomeRule(userId: string, id: string): Promise<boolean>;
+
+  setRecurringIncomeReceivedForMonth(
+    userId: string,
+    recurringRuleId: string,
+    year: number,
+    month: number,
+    received: boolean
   ): Promise<void>;
 }

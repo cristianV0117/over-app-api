@@ -26,6 +26,14 @@ import {
   FinanceRecurringExpensePaidSchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-recurring-expense-paid.schema";
 import {
+  FinanceRecurringIncomeModel,
+  FinanceRecurringIncomeSchema,
+} from "src/shared/infrastructure/mongo/schemas/finance-recurring-income.schema";
+import {
+  FinanceRecurringIncomeReceivedModel,
+  FinanceRecurringIncomeReceivedSchema,
+} from "src/shared/infrastructure/mongo/schemas/finance-recurring-income-received.schema";
+import {
   FinanceLiquidityModel,
   FinanceLiquiditySchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-liquidity.schema";
@@ -55,6 +63,10 @@ import { FinanceRecurringExpensesIndexUseCase } from "src/finance/application/fi
 import { FinanceRecurringExpensesStoreUseCase } from "src/finance/application/finance-recurring-expenses-store.useCase";
 import { FinanceRecurringExpensesUpdateUseCase } from "src/finance/application/finance-recurring-expenses-update.useCase";
 import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/finance-recurring-expenses-delete.useCase";
+import { FinanceRecurringIncomesDeleteUseCase } from "src/finance/application/finance-recurring-incomes-delete.useCase";
+import { FinanceRecurringIncomesIndexUseCase } from "src/finance/application/finance-recurring-incomes-index.useCase";
+import { FinanceRecurringIncomesStoreUseCase } from "src/finance/application/finance-recurring-incomes-store.useCase";
+import { FinanceRecurringIncomesUpdateUseCase } from "src/finance/application/finance-recurring-incomes-update.useCase";
 
 @Module({
   imports: [
@@ -76,6 +88,14 @@ import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/f
       {
         name: FinanceRecurringExpensePaidModel.name,
         schema: FinanceRecurringExpensePaidSchema,
+      },
+      {
+        name: FinanceRecurringIncomeModel.name,
+        schema: FinanceRecurringIncomeSchema,
+      },
+      {
+        name: FinanceRecurringIncomeReceivedModel.name,
+        schema: FinanceRecurringIncomeReceivedSchema,
       },
       {
         name: FinanceLiquidityModel.name,
@@ -115,6 +135,10 @@ import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/f
     FinanceRecurringExpensesStoreUseCase,
     FinanceRecurringExpensesUpdateUseCase,
     FinanceRecurringExpensesDeleteUseCase,
+    FinanceRecurringIncomesIndexUseCase,
+    FinanceRecurringIncomesStoreUseCase,
+    FinanceRecurringIncomesUpdateUseCase,
+    FinanceRecurringIncomesDeleteUseCase,
     FinanceMonthlySummaryUseCase,
     FinanceLiquidityReplaceUseCase,
   ],

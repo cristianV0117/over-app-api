@@ -20,6 +20,10 @@ export class FinanceIncomeLine {
       amount: this.props.amount,
       receivedAt: this.props.receivedAt,
       notes: this.props.notes ?? "",
+      label: this.props.label,
+      isRecurring: this.props.isRecurring ?? false,
+      recurringRuleId: this.props.recurringRuleId,
+      received: this.props.received ?? true,
     };
   }
 }

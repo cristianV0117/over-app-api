@@ -1,30 +1,34 @@
 import {
   IsBoolean,
-  IsDate,
   IsMongoId,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from "class-validator";
 import { Type } from "class-transformer";
 
-export class FinanceIncomeUpdateDto {
-  @IsOptional()
+export class FinanceRecurringIncomeStoreDto {
   @IsMongoId()
-  categoryId?: string;
+  categoryId!: string;
 
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  amount?: number;
+  amount!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(31)
+  dayOfMonth!: number;
 
   @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  receivedAt?: Date;
+  @IsString()
+  @MaxLength(120)
+  label?: string;
 
   @IsOptional()
   @IsString()
@@ -34,5 +38,5 @@ export class FinanceIncomeUpdateDto {
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
-  received?: boolean;
+  isActive?: boolean;
 }

@@ -23,5 +23,10 @@ export class FinanceIncomeCategoriesDeleteUseCase {
         "No puedes eliminar la categoría mientras tenga ingresos asociados"
       );
     }
+    if (result === "has_recurring") {
+      throw new ConflictException(
+        "No puedes eliminar la categoría mientras haya ingresos recurrentes que la usen"
+      );
+    }
   }
 }
