@@ -21,6 +21,8 @@ import { FinanceExpenseStoreDto } from "../dtos/finance-expense-store.dto";
 import { FinanceExpenseUpdateDto } from "../dtos/finance-expense-update.dto";
 import { FinanceRecurringExpenseStoreDto } from "../dtos/finance-recurring-expense-store.dto";
 import { FinanceRecurringExpenseUpdateDto } from "../dtos/finance-recurring-expense-update.dto";
+import { FinanceRecurringIncomeStoreDto } from "../dtos/finance-recurring-income-store.dto";
+import { FinanceRecurringIncomeUpdateDto } from "../dtos/finance-recurring-income-update.dto";
 import { FinanceIncomeCategoryStoreDto } from "../dtos/finance-income-category-store.dto";
 import { FinanceIncomeCategoryUpdateDto } from "../dtos/finance-income-category-update.dto";
 import { FinanceIncomeStoreDto } from "../dtos/finance-income-store.dto";
@@ -45,6 +47,10 @@ import { FinanceRecurringExpensesIndexUseCase } from "src/finance/application/fi
 import { FinanceRecurringExpensesStoreUseCase } from "src/finance/application/finance-recurring-expenses-store.useCase";
 import { FinanceRecurringExpensesUpdateUseCase } from "src/finance/application/finance-recurring-expenses-update.useCase";
 import { FinanceRecurringExpensesDeleteUseCase } from "src/finance/application/finance-recurring-expenses-delete.useCase";
+import { FinanceRecurringIncomesDeleteUseCase } from "src/finance/application/finance-recurring-incomes-delete.useCase";
+import { FinanceRecurringIncomesIndexUseCase } from "src/finance/application/finance-recurring-incomes-index.useCase";
+import { FinanceRecurringIncomesStoreUseCase } from "src/finance/application/finance-recurring-incomes-store.useCase";
+import { FinanceRecurringIncomesUpdateUseCase } from "src/finance/application/finance-recurring-incomes-update.useCase";
 import { FinanceMonthlySummaryUseCase } from "src/finance/application/finance-monthly-summary.useCase";
 import { FinanceLiquidityPutDto } from "../dtos/finance-liquidity-put.dto";
 import { FinanceLiquidityReplaceUseCase } from "src/finance/application/finance-liquidity-replace.useCase";
@@ -72,6 +78,10 @@ export class FinanceController {
     private readonly recurringExpensesStore: FinanceRecurringExpensesStoreUseCase,
     private readonly recurringExpensesUpdate: FinanceRecurringExpensesUpdateUseCase,
     private readonly recurringExpensesDelete: FinanceRecurringExpensesDeleteUseCase,
+    private readonly recurringIncomesIndex: FinanceRecurringIncomesIndexUseCase,
+    private readonly recurringIncomesStore: FinanceRecurringIncomesStoreUseCase,
+    private readonly recurringIncomesUpdate: FinanceRecurringIncomesUpdateUseCase,
+    private readonly recurringIncomesDelete: FinanceRecurringIncomesDeleteUseCase,
     private readonly monthlySummary: FinanceMonthlySummaryUseCase,
     private readonly liquidityReplace: FinanceLiquidityReplaceUseCase
   ) {}
@@ -167,10 +177,19 @@ export class FinanceController {
   @UseGuards(JwtAuthGuard)
   async incomesPatch(
     @Param("id") id: string,
+    @Req() req: RequestWithUser,
     @Body() body: FinanceIncomeUpdateDto,
-    @Req() req: RequestWithUser
+    @Query("year") yearStr?: string,
+    @Query("month") monthStr?: string
   ) {
-    const e = await this.incomesUpdate.execute(id, body, req.user.id);
+    const ctx =
+      yearStr !== undefined &&
+      monthStr !== undefined &&
+      yearStr !== "" &&
+      monthStr !== ""
+        ? { year: Number(yearStr), month: Number(monthStr) }
+        : undefined;
+    const e = await this.incomesUpdate.execute(id, body, req.user.id, ctx);
     return e.toJSON();
   }
 
@@ -312,6 +331,44 @@ export class FinanceController {
     @Req() req: RequestWithUser
   ) {
     await this.recurringExpensesDelete.execute(id, req.user.id);
+    return { ok: true };
+  }
+
+  @Get("recurring-incomes")
+  @UseGuards(JwtAuthGuard)
+  async recurringIncomesList(@Req() req: RequestWithUser) {
+    const list = await this.recurringIncomesIndex.execute(req.user.id);
+    return list.map((r) => r.toJSON());
+  }
+
+  @Post("recurring-incomes")
+  @UseGuards(JwtAuthGuard)
+  async recurringIncomesPost(
+    @Body() body: FinanceRecurringIncomeStoreDto,
+    @Req() req: RequestWithUser
+  ) {
+    const r = await this.recurringIncomesStore.execute(body, req.user.id);
+    return r.toJSON();
+  }
+
+  @Patch("recurring-incomes/:id")
+  @UseGuards(JwtAuthGuard)
+  async recurringIncomesPatch(
+    @Param("id") id: string,
+    @Body() body: FinanceRecurringIncomeUpdateDto,
+    @Req() req: RequestWithUser
+  ) {
+    const r = await this.recurringIncomesUpdate.execute(id, body, req.user.id);
+    return r.toJSON();
+  }
+
+  @Delete("recurring-incomes/:id")
+  @UseGuards(JwtAuthGuard)
+  async recurringIncomesRemove(
+    @Param("id") id: string,
+    @Req() req: RequestWithUser
+  ) {
+    await this.recurringIncomesDelete.execute(id, req.user.id);
     return { ok: true };
   }
 }

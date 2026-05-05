@@ -11,6 +11,7 @@ import { FinanceExpense } from "src/finance/domain/finance-expense";
 import { IncomeCategory } from "src/finance/domain/income-category";
 import { FinanceIncomeLine } from "src/finance/domain/finance-income-line";
 import { FinanceRecurringExpense } from "src/finance/domain/finance-recurring-expense";
+import { FinanceRecurringIncome } from "src/finance/domain/finance-recurring-income";
 import {
   FinanceExpenseCategoryModel,
   FinanceExpenseCategoryDocument,
@@ -39,14 +40,23 @@ import {
   FinanceRecurringExpensePaidDocument,
   FinanceRecurringExpensePaidModel,
 } from "src/shared/infrastructure/mongo/schemas/finance-recurring-expense-paid.schema";
-
-export const RECURRING_EXPENSE_ID_PREFIX = "recurring:";
+import {
+  FinanceRecurringIncomeDocument,
+  FinanceRecurringIncomeModel,
+} from "src/shared/infrastructure/mongo/schemas/finance-recurring-income.schema";
+import {
+  FinanceRecurringIncomeReceivedDocument,
+  FinanceRecurringIncomeReceivedModel,
+} from "src/shared/infrastructure/mongo/schemas/finance-recurring-income-received.schema";
 
 function monthRangeUtc(year: number, month: number) {
   const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
   const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
   return { start, end };
 }
+
+export const RECURRING_EXPENSE_ID_PREFIX = "recurring:";
+export const RECURRING_INCOME_ID_PREFIX = "recurring-income:";
 
 export class FinanceLedgerImplementation implements FinanceLedgerRepository {
   constructor(
@@ -63,7 +73,11 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     @InjectModel(FinanceLiquidityModel.name)
     private readonly liquidityModel: Model<FinanceLiquidityDocument>,
     @InjectModel(FinanceRecurringExpensePaidModel.name)
-    private readonly recurringExpensePaidModel: Model<FinanceRecurringExpensePaidDocument>
+    private readonly recurringExpensePaidModel: Model<FinanceRecurringExpensePaidDocument>,
+    @InjectModel(FinanceRecurringIncomeModel.name)
+    private readonly recurringIncomeModel: Model<FinanceRecurringIncomeDocument>,
+    @InjectModel(FinanceRecurringIncomeReceivedModel.name)
+    private readonly recurringIncomeReceivedModel: Model<FinanceRecurringIncomeReceivedDocument>
   ) {}
 
   async findIncomeCategoriesByUser(userId: string): Promise<IncomeCategory[]> {
@@ -132,6 +146,11 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       categoryId: cid,
     });
     if (n > 0) return "has_incomes";
+    const nr = await this.recurringIncomeModel.countDocuments({
+      userId: uid,
+      categoryId: cid,
+    });
+    if (nr > 0) return "has_recurring";
     const res = await this.incomeCategoryModel.findOneAndDelete({
       _id: cid,
       userId: uid,
@@ -184,8 +203,48 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       .sort({ receivedAt: -1 })
       .lean()
       .exec();
-    return docs.map((d) =>
+    const mappedReal = docs.map((d) =>
       this.mapIncomeDoc(d as unknown as Record<string, unknown>)
+    );
+    const recurringDocs = await this.recurringIncomeModel
+      .find({ userId: new Types.ObjectId(userId), isActive: true })
+      .populate<{ categoryId: FinanceIncomeCategoryModel }>("categoryId")
+      .lean()
+      .exec();
+
+    const ruleIdList = recurringDocs.map((r) => r._id as Types.ObjectId);
+    const receivedMarks =
+      ruleIdList.length === 0
+        ? []
+        : await this.recurringIncomeReceivedModel
+            .find({
+              userId: new Types.ObjectId(userId),
+              year,
+              month,
+              recurringRuleId: { $in: ruleIdList },
+            })
+            .lean()
+            .exec();
+    const receivedByRule = new Map<string, boolean>();
+    for (const m of receivedMarks) {
+      receivedByRule.set(
+        (m.recurringRuleId as Types.ObjectId).toString(),
+        !!m.received
+      );
+    }
+
+    const synthetic = recurringDocs.map((r) =>
+      this.syntheticIncomeFromRecurringRule(
+        r as unknown as Record<string, unknown>,
+        userId,
+        year,
+        month,
+        receivedByRule.get((r._id as Types.ObjectId).toString()) ?? false
+      )
+    );
+    return [...mappedReal, ...synthetic].sort(
+      (a, b) =>
+        b.toJSON().receivedAt.getTime() - a.toJSON().receivedAt.getTime()
     );
   }
 
@@ -197,6 +256,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       amount?: number;
       receivedAt?: Date;
       notes?: string;
+      received?: boolean;
     }
   ): Promise<FinanceIncomeLine | null> {
     const uid = new Types.ObjectId(userId);
@@ -594,6 +654,126 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     return !!res;
   }
 
+  async findRecurringIncomeRulesByUser(
+    userId: string
+  ): Promise<FinanceRecurringIncome[]> {
+    const docs = await this.recurringIncomeModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .populate<{ categoryId: FinanceIncomeCategoryModel }>("categoryId")
+      .sort({ isActive: -1, label: 1, createdAt: 1 })
+      .lean()
+      .exec();
+    return docs.map((d) =>
+      this.mapRecurringIncomeRuleEntity(d as unknown as Record<string, unknown>)
+    );
+  }
+
+  async createRecurringIncomeRule(
+    userId: string,
+    data: {
+      categoryId: string;
+      amount: number;
+      dayOfMonth: number;
+      label?: string;
+      notes?: string;
+      isActive?: boolean;
+    }
+  ): Promise<FinanceRecurringIncome> {
+    const uid = new Types.ObjectId(userId);
+    const cat = await this.incomeCategoryModel
+      .findOne({ _id: new Types.ObjectId(data.categoryId), userId: uid })
+      .lean()
+      .exec();
+    if (!cat) {
+      throw new Error("Categoría de ingreso no encontrada");
+    }
+    const day = Math.min(31, Math.max(1, Math.floor(data.dayOfMonth)));
+    const created = await this.recurringIncomeModel.create({
+      userId: uid,
+      categoryId: new Types.ObjectId(data.categoryId),
+      amount: data.amount,
+      dayOfMonth: day,
+      label: data.label?.trim() ?? "",
+      notes: data.notes?.trim() ?? "",
+      isActive: data.isActive ?? true,
+    });
+    const populated = await this.recurringIncomeModel
+      .findById(created._id)
+      .populate<{ categoryId: FinanceIncomeCategoryModel }>("categoryId")
+      .lean()
+      .exec();
+    return this.mapRecurringIncomeRuleEntity(
+      populated as unknown as Record<string, unknown>
+    );
+  }
+
+  async updateRecurringIncomeRule(
+    userId: string,
+    id: string,
+    patch: {
+      categoryId?: string;
+      amount?: number;
+      dayOfMonth?: number;
+      label?: string;
+      notes?: string;
+      isActive?: boolean;
+    }
+  ): Promise<FinanceRecurringIncome | null> {
+    const uid = new Types.ObjectId(userId);
+    if (patch.categoryId) {
+      const cat = await this.incomeCategoryModel
+        .findOne({
+          _id: new Types.ObjectId(patch.categoryId),
+          userId: uid,
+        })
+        .lean()
+        .exec();
+      if (!cat) throw new Error("Categoría de ingreso no encontrada");
+    }
+    const $set: Record<string, unknown> = {};
+    if (patch.categoryId !== undefined)
+      $set.categoryId = new Types.ObjectId(patch.categoryId);
+    if (patch.amount !== undefined) $set.amount = patch.amount;
+    if (patch.dayOfMonth !== undefined)
+      $set.dayOfMonth = Math.min(31, Math.max(1, Math.floor(patch.dayOfMonth)));
+    if (patch.label !== undefined) $set.label = patch.label.trim();
+    if (patch.notes !== undefined) $set.notes = patch.notes.trim();
+    if (patch.isActive !== undefined) $set.isActive = patch.isActive;
+    if (Object.keys($set).length === 0) {
+      const existing = await this.recurringIncomeModel
+        .findOne({ _id: new Types.ObjectId(id), userId: uid })
+        .populate<{ categoryId: FinanceIncomeCategoryModel }>("categoryId")
+        .lean()
+        .exec();
+      return existing
+        ? this.mapRecurringIncomeRuleEntity(
+            existing as unknown as Record<string, unknown>
+          )
+        : null;
+    }
+    const updated = await this.recurringIncomeModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(id), userId: uid },
+        { $set },
+        { new: true }
+      )
+      .populate<{ categoryId: FinanceIncomeCategoryModel }>("categoryId")
+      .lean()
+      .exec();
+    if (!updated) return null;
+    return this.mapRecurringIncomeRuleEntity(
+      updated as unknown as Record<string, unknown>
+    );
+  }
+
+  async deleteRecurringIncomeRule(userId: string, id: string): Promise<boolean> {
+    const res = await this.recurringIncomeModel.findOneAndDelete({
+      _id: new Types.ObjectId(id),
+      userId: new Types.ObjectId(userId),
+    });
+    return !!res;
+  }
+
   private lastDayOfMonthUtc(year: number, month: number): number {
     return new Date(Date.UTC(year, month, 0)).getUTCDate();
   }
@@ -638,6 +818,81 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       isRecurring: true,
       recurringRuleId: ruleId,
       paid,
+    });
+  }
+
+  private syntheticIncomeFromRecurringRule(
+    rule: Record<string, unknown>,
+    userId: string,
+    year: number,
+    month: number,
+    received: boolean
+  ): FinanceIncomeLine {
+    const ruleId = (rule._id as Types.ObjectId).toString();
+    const catRaw = rule.categoryId;
+    let categoryId: string;
+    let categoryName: string | undefined;
+    if (
+      catRaw &&
+      typeof catRaw === "object" &&
+      !(catRaw instanceof Types.ObjectId)
+    ) {
+      const c = catRaw as { _id?: Types.ObjectId; name?: string };
+      categoryId = (c._id ?? (catRaw as { _id: Types.ObjectId })._id).toString();
+      categoryName = c.name;
+    } else {
+      categoryId = (catRaw as Types.ObjectId).toString();
+    }
+    const dom = Math.min(31, Math.max(1, (rule.dayOfMonth as number) || 1));
+    const last = this.lastDayOfMonthUtc(year, month);
+    const day = Math.min(dom, last);
+    const receivedAt = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    const label = ((rule.label as string) ?? "").trim();
+    const notes = ((rule.notes as string) ?? "").trim();
+    return new FinanceIncomeLine({
+      id: `${RECURRING_INCOME_ID_PREFIX}${ruleId}`,
+      userId,
+      categoryId,
+      categoryName,
+      amount: rule.amount as number,
+      receivedAt,
+      notes,
+      label: label || undefined,
+      isRecurring: true,
+      recurringRuleId: ruleId,
+      received,
+    });
+  }
+
+  private mapRecurringIncomeRuleEntity(
+    d: Record<string, unknown>
+  ): FinanceRecurringIncome {
+    const _id = d._id as Types.ObjectId;
+    const userId = d.userId as Types.ObjectId;
+    const catRaw = d.categoryId;
+    let categoryId: string;
+    let categoryName: string | undefined;
+    if (
+      catRaw &&
+      typeof catRaw === "object" &&
+      !(catRaw instanceof Types.ObjectId)
+    ) {
+      const c = catRaw as { _id?: Types.ObjectId; name?: string };
+      categoryId = (c._id ?? (catRaw as { _id: Types.ObjectId })._id).toString();
+      categoryName = c.name;
+    } else {
+      categoryId = (catRaw as Types.ObjectId).toString();
+    }
+    return new FinanceRecurringIncome({
+      id: _id.toString(),
+      userId: userId.toString(),
+      categoryId,
+      categoryName,
+      amount: d.amount as number,
+      dayOfMonth: d.dayOfMonth as number,
+      label: (d.label as string) ?? "",
+      notes: (d.notes as string) ?? "",
+      isActive: (d.isActive as boolean) ?? true,
     });
   }
 
@@ -792,6 +1047,34 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
         month,
       },
       { $set: { paid: !!paid } },
+      { upsert: true }
+    );
+  }
+
+  async setRecurringIncomeReceivedForMonth(
+    userId: string,
+    recurringRuleId: string,
+    year: number,
+    month: number,
+    received: boolean
+  ): Promise<void> {
+    const uid = new Types.ObjectId(userId);
+    const rid = new Types.ObjectId(recurringRuleId);
+    const rule = await this.recurringIncomeModel
+      .findOne({ _id: rid, userId: uid })
+      .lean()
+      .exec();
+    if (!rule) {
+      throw new Error("Regla de ingreso recurrente no encontrada");
+    }
+    await this.recurringIncomeReceivedModel.findOneAndUpdate(
+      {
+        userId: uid,
+        recurringRuleId: rid,
+        year,
+        month,
+      },
+      { $set: { received: !!received } },
       { upsert: true }
     );
   }

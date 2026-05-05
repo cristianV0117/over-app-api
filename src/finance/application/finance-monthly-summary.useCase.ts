@@ -15,6 +15,10 @@ export type FinanceMonthlySummaryResult = {
     amount: number;
     receivedAt: Date;
     notes: string;
+    label?: string;
+    isRecurring?: boolean;
+    recurringRuleId?: string;
+    received?: boolean;
   }>;
   totalExpenses: number;
   expenseBreakdown: { categoryId: string; categoryName: string; total: number }[];
