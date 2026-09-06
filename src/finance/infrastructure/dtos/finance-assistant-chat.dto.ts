@@ -10,12 +10,26 @@ import {
   ValidateNested,
 } from "class-validator";
 
+const ATTACHMENT_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  "application/csv",
+  "text/plain",
+  "application/octet-stream",
+] as const;
+
 export class FinanceAssistantAttachmentDto {
-  @IsIn(["image/jpeg", "image/png", "image/webp", "image/gif"])
+  @IsIn(ATTACHMENT_MIMES)
   mimeType!: string;
 
   @IsString()
-  @MaxLength(8_000_000)
+  @MaxLength(12_000_000)
   dataBase64!: string;
 
   @IsOptional()

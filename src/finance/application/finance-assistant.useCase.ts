@@ -17,14 +17,9 @@ import {
   simulateDebtPlan,
   type DebtPayoffInput,
 } from "src/finance/domain/debt-payoff";
+import { extractAttachmentForLlm } from "./finance-assistant-attachment";
 
 const MAX_THREAD_MESSAGES = 40;
-const ALLOWED_IMAGE = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
 
 export type AssistantMessageDto = {
   role: "user" | "assistant";
@@ -199,26 +194,34 @@ export class FinanceAssistantUseCase {
       })),
     ];
 
-    if (body.attachment && ALLOWED_IMAGE.has(body.attachment.mimeType)) {
-      const raw = body.attachment.dataBase64.replace(/^data:[^;]+;base64,/, "");
-      llmMessages.push({
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text:
-              userText +
-              (attachmentName ? `\n[Adjunto: ${attachmentName}]` : "") +
-              "\nSi es un crédito o deuda, extraé tasa, cuota, saldo y plazo y llamá report_extracted_debt.",
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:${body.attachment.mimeType};base64,${raw}`,
-            },
-          },
-        ],
+    if (body.attachment) {
+      const extracted = await extractAttachmentForLlm({
+        mimeType: body.attachment.mimeType,
+        dataBase64: body.attachment.dataBase64,
+        fileName: attachmentName,
       });
+      const hint =
+        (attachmentName ? `\n[Adjunto: ${attachmentName}]` : "") +
+        "\nSi el documento es un crédito, extracto o deuda, extraé tasa, cuota, saldo y plazo y llamá report_extracted_debt.";
+      if (extracted.kind === "image") {
+        llmMessages.push({
+          role: "user",
+          content: [
+            { type: "text", text: userText + hint },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${extracted.mimeType};base64,${extracted.rawBase64}`,
+              },
+            },
+          ],
+        });
+      } else {
+        llmMessages.push({
+          role: "user",
+          content: `${userText}${hint}\n\n--- Contenido del archivo ---\n${extracted.text}`,
+        });
+      }
     } else {
       llmMessages.push({ role: "user", content: userText });
     }
