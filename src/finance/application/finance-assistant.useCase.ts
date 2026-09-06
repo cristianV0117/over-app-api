@@ -183,8 +183,15 @@ export class FinanceAssistantUseCase {
     const compact = await this.buildCompactContext(userId, body.year, body.month);
     const prior = await this.history(userId);
 
-    const userText = body.message.trim() || "Analizá el documento adjunto.";
-    const attachmentName = body.attachment?.fileName?.trim() || "";
+    const userText = body.message.trim() || "Analizá los documentos adjuntos.";
+    const incoming = [
+      ...(body.attachments ?? []),
+      ...(body.attachment ? [body.attachment] : []),
+    ].slice(0, 6);
+    const attachmentName = incoming
+      .map((a) => a.fileName?.trim())
+      .filter(Boolean)
+      .join(" · ");
 
     const llmMessages: ChatApiMessage[] = [
       { role: "system", content: this.systemPrompt(compact) },
@@ -194,33 +201,41 @@ export class FinanceAssistantUseCase {
       })),
     ];
 
-    if (body.attachment) {
-      const extracted = await extractAttachmentForLlm({
-        mimeType: body.attachment.mimeType,
-        dataBase64: body.attachment.dataBase64,
-        fileName: attachmentName,
-      });
+    if (incoming.length > 0) {
+      const images: Array<{
+        type: "image_url";
+        image_url: { url: string };
+      }> = [];
+      const texts: string[] = [];
+      for (const file of incoming) {
+        const extracted = await extractAttachmentForLlm({
+          mimeType: file.mimeType,
+          dataBase64: file.dataBase64,
+          fileName: file.fileName,
+        });
+        const label = file.fileName?.trim() || "archivo";
+        if (extracted.kind === "image") {
+          images.push({
+            type: "image_url",
+            image_url: {
+              url: `data:${extracted.mimeType};base64,${extracted.rawBase64}`,
+            },
+          });
+        } else {
+          texts.push(`--- ${label} ---\n${extracted.text}`);
+        }
+      }
       const hint =
-        (attachmentName ? `\n[Adjunto: ${attachmentName}]` : "") +
-        "\nSi el documento es un crédito, extracto o deuda, extraé tasa, cuota, saldo y plazo y llamá report_extracted_debt.";
-      if (extracted.kind === "image") {
+        (attachmentName ? `\n[Adjuntos: ${attachmentName}]` : "") +
+        "\nHay varios archivos. Revisalos todos. Si alguno es crédito o deuda, extraé tasa, cuota, saldo y plazo y llamá report_extracted_debt por cada uno.";
+      const textBlock = [userText + hint, ...texts].filter(Boolean).join("\n\n");
+      if (images.length > 0) {
         llmMessages.push({
           role: "user",
-          content: [
-            { type: "text", text: userText + hint },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${extracted.mimeType};base64,${extracted.rawBase64}`,
-              },
-            },
-          ],
+          content: [{ type: "text", text: textBlock }, ...images],
         });
       } else {
-        llmMessages.push({
-          role: "user",
-          content: `${userText}${hint}\n\n--- Contenido del archivo ---\n${extracted.text}`,
-        });
+        llmMessages.push({ role: "user", content: textBlock });
       }
     } else {
       llmMessages.push({ role: "user", content: userText });

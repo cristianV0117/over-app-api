@@ -1,5 +1,7 @@
 import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsInt,
   IsOptional,
@@ -59,4 +61,11 @@ export class FinanceAssistantChatDto {
   @ValidateNested()
   @Type(() => FinanceAssistantAttachmentDto)
   attachment?: FinanceAssistantAttachmentDto;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => FinanceAssistantAttachmentDto)
+  attachments?: FinanceAssistantAttachmentDto[];
 }
