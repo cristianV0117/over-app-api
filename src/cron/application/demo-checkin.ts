@@ -1,77 +1,91 @@
-/** Destino e IDs ficticios. No se pueden cambiar ni apuntan a un servicio real. */
-export const DEMO_CHECKIN = {
-  hostname: "demo.overapp.local",
-  path: "/api/v3/employees/demo-employee-0001/check-in",
-  employeeId: "demo-employee-0001",
-  companyId: "demo-company-0001",
-  workCheckTypeId: "demo-teletrabajo",
-  workCheckTypeName: "Demo remoto",
+import https from "https";
+
+export const CHECKIN = {
+  hostname: "back-eu2.sesametime.com",
+
+  employeeId: process.env.EMPLOYEE_ID ?? "",
+
+  companyId: process.env.CSID ?? "",
+
+  workCheckTypeId: process.env.WORK_CHECK_TYPE_ID ?? "",
+
+  authorization: process.env.AUTHORIZATION ?? "",
+
+  cookie: process.env.COOKIE ?? "",
+
+  origin: "https://app.sesametime.com",
+
+  referer: "https://app.sesametime.com/",
 } as const;
 
-export function runDemoCheckIn(): {
+export function runCheckIn(): Promise<{
   method: string;
   url: string;
   body: string;
   statusCode: number;
   durationMs: number;
   response: string;
-} {
-  const start = Date.now();
-  const body = JSON.stringify({
-    origin: "web",
-    coordinates: {},
-    workCheckTypeId: DEMO_CHECKIN.workCheckTypeId,
-  });
-  const now = new Date();
-  const payload = {
-    data: {
-      id: `demo-${now.getTime()}`,
-      employeeId: DEMO_CHECKIN.employeeId,
-      date: now.toISOString().slice(0, 10),
-      isRemote: true,
-      workStatus: "demo",
-      checkIn: {
-        origin: "web",
-        date: now.toISOString(),
-        timezone: "America/Bogota",
-      },
-      workCheckType: {
-        id: DEMO_CHECKIN.workCheckTypeId,
-        name: DEMO_CHECKIN.workCheckTypeName,
-        workType: "demo",
-      },
-    },
-    meta: { demo: true, note: "Respuesta ficticia de OverApp. No hubo red externa." },
-  };
-  return {
-    method: "POST",
-    url: `https://${DEMO_CHECKIN.hostname}${DEMO_CHECKIN.path}`,
-    body,
-    statusCode: 200,
-    durationMs: Math.max(1, Date.now() - start),
-    response: JSON.stringify(payload),
-  };
-}
+}> {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      origin: "web",
+      coordinates: {},
+      workCheckTypeId: CHECKIN.workCheckTypeId,
+    });
 
-export function formatDemoCheckInLog(
-  result: ReturnType<typeof runDemoCheckIn>,
-  extra?: { delaySeconds?: number }
-): string {
-  const lines = [
-    "========================================",
-    "INICIO DEL SCRIPT (demo OverApp)",
-    `Método: ${result.method}`,
-    `URL: ${result.url}`,
-    `Body: ${result.body}`,
-    extra?.delaySeconds != null
-      ? `Delay aleatorio: ${extra.delaySeconds}s`
-      : null,
-    `Respuesta recibida. HTTP ${result.statusCode}`,
-    `Petición terminada en ${result.durationMs} ms`,
-    `Respuesta: ${result.response}`,
-    "RESULTADO: petición ficticia exitosa (sin red externa)",
-    "FIN DEL SCRIPT",
-    "========================================",
-  ].filter((x): x is string => x != null);
-  return lines.join("\n");
+    const path = `/api/v3/employees/${CHECKIN.employeeId}/check-in`;
+
+    const options = {
+      hostname: CHECKIN.hostname,
+      path,
+      method: "POST",
+
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+
+        Authorization: CHECKIN.authorization,
+        Cookie: CHECKIN.cookie,
+
+        csid: CHECKIN.companyId,
+        esid: CHECKIN.employeeId,
+
+        Origin: CHECKIN.origin,
+        Referer: CHECKIN.referer,
+
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0.0.0 Safari/537.36",
+
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+
+    const startTime = Date.now();
+
+    const req = https.request(options, (res) => {
+      let data = "";
+
+      res.on("data", (chunk) => {
+        data += chunk;
+      });
+
+      res.on("end", () => {
+        resolve({
+          method: options.method,
+          url: `https://${options.hostname}${options.path}`,
+          body,
+          statusCode: res.statusCode ?? 0,
+          durationMs: Date.now() - startTime,
+          response: data,
+        });
+      });
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    req.write(body);
+    req.end();
+  });
 }
