@@ -1,4 +1,4 @@
-import https from "https";
+import * as https from "https";
 
 export const CHECKIN = {
   hostname: "back-eu2.sesametime.com",
