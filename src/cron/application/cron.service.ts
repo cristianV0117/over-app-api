@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Inject, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Cron } from "@nestjs/schedule";
 import { Model, Types } from "mongoose";
@@ -11,6 +11,7 @@ import {
   CronLogModel,
 } from "src/shared/infrastructure/mongo/schemas/cron-log.schema";
 import { CronConfigPutDto } from "../infrastructure/dtos/cron-config-put.dto";
+import { UsersLoginRepository } from "src/users/domain/repositories/users-login.repository";
 import { assertCronExpression, cronSlotIfDue } from "./cron-expression";
 import { formatDemoCheckInLog, runDemoCheckIn } from "./demo-checkin";
 
@@ -43,7 +44,9 @@ export class CronJobsService {
     @InjectModel(CronConfigModel.name)
     private readonly configModel: Model<CronConfigDocument>,
     @InjectModel(CronLogModel.name)
-    private readonly logModel: Model<CronLogDocument>
+    private readonly logModel: Model<CronLogDocument>,
+    @Inject("UsersLoginRepository")
+    private readonly users: UsersLoginRepository
   ) {}
 
   async getConfig(userId: string): Promise<CronConfigDto> {
@@ -103,6 +106,9 @@ export class CronJobsService {
     for (const cfg of configs) {
       const userId = String(cfg.userId);
       try {
+        const account = await this.users.findById(userId);
+        if (!account || account.getRole() !== "admin") continue;
+
         if ((cfg.scheduleType || "interval") === "cron") {
           const slot = cronSlotIfDue(
             cfg.cronExpression || DEFAULT_CRON,
