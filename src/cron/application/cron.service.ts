@@ -152,10 +152,22 @@ export class CronJobsService {
     if (delaySeconds > 0) {
       await new Promise((r) => setTimeout(r, delaySeconds * 1000));
     }
-    const result = runDemoCheckIn();
-    const message = formatDemoCheckInLog(result, {
-      delaySeconds: delaySeconds || undefined,
-    });
+    let message: string;
+    try {
+      const result = await runDemoCheckIn();
+      message = formatDemoCheckInLog(result, {
+        delaySeconds: delaySeconds || undefined,
+      });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      message = [
+        "RESULTADO: error de red",
+        `Error: ${err}`,
+        delaySeconds > 0 ? `(delay ${delaySeconds}s)` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
     return this.appendLog(userId, source, message);
   }
 
