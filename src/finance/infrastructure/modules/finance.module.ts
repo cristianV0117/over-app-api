@@ -37,6 +37,14 @@ import {
   FinanceLiquidityModel,
   FinanceLiquiditySchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-liquidity.schema";
+import {
+  FinanceDebtModel,
+  FinanceDebtSchema,
+} from "src/shared/infrastructure/mongo/schemas/finance-debt.schema";
+import {
+  FinanceAssistantThreadModel,
+  FinanceAssistantThreadSchema,
+} from "src/shared/infrastructure/mongo/schemas/finance-assistant-thread.schema";
 import { FinanceController } from "../controllers/finance.controller";
 import { FinanceLedgerImplementation } from "../implementations/mongo/finance-ledger.implementation";
 import { JwtStrategy } from "src/shared/infrastructure/strategies/jwt.strategy";
@@ -67,6 +75,12 @@ import { FinanceRecurringIncomesDeleteUseCase } from "src/finance/application/fi
 import { FinanceRecurringIncomesIndexUseCase } from "src/finance/application/finance-recurring-incomes-index.useCase";
 import { FinanceRecurringIncomesStoreUseCase } from "src/finance/application/finance-recurring-incomes-store.useCase";
 import { FinanceRecurringIncomesUpdateUseCase } from "src/finance/application/finance-recurring-incomes-update.useCase";
+import { FinanceDebtsIndexUseCase } from "src/finance/application/finance-debts-index.useCase";
+import { FinanceDebtsStoreUseCase } from "src/finance/application/finance-debts-store.useCase";
+import { FinanceDebtsUpdateUseCase } from "src/finance/application/finance-debts-update.useCase";
+import { FinanceDebtsDeleteUseCase } from "src/finance/application/finance-debts-delete.useCase";
+import { FinanceExportUseCase } from "src/finance/application/finance-export.useCase";
+import { FinanceAssistantUseCase } from "src/finance/application/finance-assistant.useCase";
 
 @Module({
   imports: [
@@ -100,6 +114,11 @@ import { FinanceRecurringIncomesUpdateUseCase } from "src/finance/application/fi
       {
         name: FinanceLiquidityModel.name,
         schema: FinanceLiquiditySchema,
+      },
+      { name: FinanceDebtModel.name, schema: FinanceDebtSchema },
+      {
+        name: FinanceAssistantThreadModel.name,
+        schema: FinanceAssistantThreadSchema,
       },
     ]),
     JwtModule.register({
@@ -141,6 +160,12 @@ import { FinanceRecurringIncomesUpdateUseCase } from "src/finance/application/fi
     FinanceRecurringIncomesDeleteUseCase,
     FinanceMonthlySummaryUseCase,
     FinanceLiquidityReplaceUseCase,
+    FinanceDebtsIndexUseCase,
+    FinanceDebtsStoreUseCase,
+    FinanceDebtsUpdateUseCase,
+    FinanceDebtsDeleteUseCase,
+    FinanceExportUseCase,
+    FinanceAssistantUseCase,
   ],
 })
 export class FinanceModule {}
