@@ -10,13 +10,21 @@ import {
   CronLogDocument,
   CronLogModel,
 } from "src/shared/infrastructure/mongo/schemas/cron-log.schema";
+import { CronConfigPutDto } from "../infrastructure/dtos/cron-config-put.dto";
+import { assertCronExpression, cronSlotIfDue } from "./cron-expression";
+import { formatDemoCheckInLog, runDemoCheckIn } from "./demo-checkin";
 
-const HELLO = "hola mundo";
 const MAX_LOGS_PER_USER = 200;
+const DEFAULT_CRON = "40 3 * * 1-5";
+const DEFAULT_TZ = "America/Bogota";
 
 export type CronConfigDto = {
   enabled: boolean;
+  scheduleType: "interval" | "cron";
   everyMinutes: number;
+  cronExpression: string;
+  timezone: string;
+  randomDelayMaxSeconds: number;
   lastRunAt: string | null;
 };
 
@@ -45,18 +53,28 @@ export class CronJobsService {
 
   async putConfig(
     userId: string,
-    enabled: boolean,
-    everyMinutes: number
+    body: CronConfigPutDto
   ): Promise<CronConfigDto> {
     const uid = new Types.ObjectId(userId);
+    const current = await this.ensureConfig(userId);
+    const scheduleType = body.scheduleType ?? current.scheduleType ?? "interval";
+    const cronExpression =
+      scheduleType === "cron"
+        ? assertCronExpression(body.cronExpression ?? current.cronExpression ?? DEFAULT_CRON)
+        : (current.cronExpression || DEFAULT_CRON);
+    const $set: Record<string, unknown> = {
+      enabled: body.enabled,
+      scheduleType,
+      cronExpression,
+      timezone: DEFAULT_TZ,
+    };
+    if (body.everyMinutes !== undefined) $set.everyMinutes = body.everyMinutes;
+    if (body.randomDelayMaxSeconds !== undefined)
+      $set.randomDelayMaxSeconds = body.randomDelayMaxSeconds;
     const doc = await this.configModel
-      .findOneAndUpdate(
-        { userId: uid },
-        { $set: { enabled, everyMinutes } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      )
+      .findOneAndUpdate({ userId: uid }, { $set }, { new: true, upsert: true })
       .exec();
-    return this.toConfigDto(doc);
+    return this.toConfigDto(doc ?? current);
   }
 
   async listLogs(userId: string, limit = 80): Promise<CronLogDto[]> {
@@ -75,22 +93,44 @@ export class CronJobsService {
   }
 
   async runNow(userId: string): Promise<CronLogDto> {
-    return this.appendLog(userId, "manual");
+    return this.executeDemo(userId, "manual", 0);
   }
 
   @Cron("* * * * *")
   async tick(): Promise<void> {
-    const now = Date.now();
+    const now = new Date();
     const configs = await this.configModel.find({ enabled: true }).lean().exec();
     for (const cfg of configs) {
-      const everyMs = Math.max(1, cfg.everyMinutes) * 60_000;
-      const last = cfg.lastRunAt ? new Date(cfg.lastRunAt).getTime() : 0;
-      if (last && now - last < everyMs) continue;
+      const userId = String(cfg.userId);
       try {
-        await this.appendLog(String(cfg.userId), "scheduled");
+        if ((cfg.scheduleType || "interval") === "cron") {
+          const slot = cronSlotIfDue(
+            cfg.cronExpression || DEFAULT_CRON,
+            cfg.timezone || DEFAULT_TZ,
+            now
+          );
+          if (!slot) continue;
+          const slotKey = slot.toISOString();
+          if (cfg.lastRunSlot === slotKey) continue;
+          await this.configModel.updateOne(
+            { userId: cfg.userId },
+            { $set: { lastRunSlot: slotKey, lastRunAt: now } }
+          );
+          const delay = this.pickDelay(cfg.randomDelayMaxSeconds);
+          void this.executeDemo(userId, "scheduled", delay).catch((e) => {
+            this.logger.warn(
+              `Cron demo falló para ${userId}: ${e instanceof Error ? e.message : e}`
+            );
+          });
+          continue;
+        }
+        const everyMs = Math.max(1, cfg.everyMinutes || 5) * 60_000;
+        const last = cfg.lastRunAt ? new Date(cfg.lastRunAt).getTime() : 0;
+        if (last && now.getTime() - last < everyMs) continue;
+        await this.executeDemo(userId, "scheduled", 0);
       } catch (e) {
         this.logger.warn(
-          `No se pudo escribir el log del cron para ${String(cfg.userId)}: ${
+          `No se pudo correr el cron para ${userId}: ${
             e instanceof Error ? e.message : e
           }`
         );
@@ -98,14 +138,36 @@ export class CronJobsService {
     }
   }
 
+  private pickDelay(maxSeconds?: number): number {
+    const max = Math.min(600, Math.max(0, maxSeconds ?? 0));
+    if (max <= 0) return 0;
+    return Math.floor(Math.random() * (max + 1));
+  }
+
+  private async executeDemo(
+    userId: string,
+    source: "scheduled" | "manual",
+    delaySeconds: number
+  ): Promise<CronLogDto> {
+    if (delaySeconds > 0) {
+      await new Promise((r) => setTimeout(r, delaySeconds * 1000));
+    }
+    const result = runDemoCheckIn();
+    const message = formatDemoCheckInLog(result, {
+      delaySeconds: delaySeconds || undefined,
+    });
+    return this.appendLog(userId, source, message);
+  }
+
   private async appendLog(
     userId: string,
-    source: "scheduled" | "manual"
+    source: "scheduled" | "manual",
+    message: string
   ): Promise<CronLogDto> {
     const uid = new Types.ObjectId(userId);
     const created = await this.logModel.create({
       userId: uid,
-      message: HELLO,
+      message,
       source,
     });
     await this.configModel.updateOne(
@@ -141,14 +203,23 @@ export class CronJobsService {
       userId: uid,
       enabled: false,
       everyMinutes: 5,
+      scheduleType: "interval",
+      cronExpression: DEFAULT_CRON,
+      timezone: DEFAULT_TZ,
+      randomDelayMaxSeconds: 0,
       lastRunAt: null,
+      lastRunSlot: null,
     });
   }
 
   private toConfigDto(doc: CronConfigDocument): CronConfigDto {
     return {
       enabled: !!doc.enabled,
+      scheduleType: doc.scheduleType === "cron" ? "cron" : "interval",
       everyMinutes: doc.everyMinutes || 5,
+      cronExpression: doc.cronExpression || DEFAULT_CRON,
+      timezone: doc.timezone || DEFAULT_TZ,
+      randomDelayMaxSeconds: doc.randomDelayMaxSeconds ?? 0,
       lastRunAt: doc.lastRunAt ? new Date(doc.lastRunAt).toISOString() : null,
     };
   }

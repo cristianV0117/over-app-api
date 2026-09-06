@@ -19,7 +19,7 @@ export class CronController {
     @Req() req: RequestWithUser,
     @Body() body: CronConfigPutDto
   ) {
-    return this.cron.putConfig(req.user.id, body.enabled, body.everyMinutes);
+    return this.cron.putConfig(req.user.id, body);
   }
 
   @Get("logs")
