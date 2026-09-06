@@ -18,6 +18,15 @@ import {
   type DebtPayoffInput,
 } from "src/finance/domain/debt-payoff";
 import { extractAttachmentForLlm } from "./finance-assistant-attachment";
+import {
+  applyLedgerImport,
+  emptyLedger,
+  ledgerHasItems,
+  mergeLedgers,
+  normalizeProposedLedger,
+  parseDay,
+  type ExtractedLedger,
+} from "./finance-assistant-ledger";
 
 const MAX_THREAD_MESSAGES = 40;
 
@@ -26,7 +35,13 @@ export type AssistantMessageDto = {
   content: string;
   attachmentName?: string;
   extractedDebt?: Record<string, unknown> | null;
+  extractedLedger?: ExtractedLedger | null;
   createdAt: string;
+};
+
+type ExtractSink = {
+  debt: Record<string, unknown> | null;
+  ledger: ExtractedLedger;
 };
 
 type ChatToolCall = {
@@ -135,6 +150,277 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "list_categories",
+      description:
+        "Lista categorías de gasto e ingreso del usuario (id y nombre).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "propose_ledger_import",
+      description:
+        "Propone un lote extraído de un extracto para que el usuario lo revise y confirme. No guarda todavía. Usala con extractos, PDF o Excel. No dupliques pagos que ya existen como gasto/ingreso recurrente.",
+      parameters: {
+        type: "object",
+        properties: {
+          expenses: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                date: { type: "string", description: "YYYY-MM-DD" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "date", "categoryName"],
+            },
+          },
+          incomes: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                date: { type: "string", description: "YYYY-MM-DD" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "date", "categoryName"],
+            },
+          },
+          expenseCategories: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" } },
+              required: ["name"],
+            },
+          },
+          incomeCategories: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" } },
+              required: ["name"],
+            },
+          },
+          recurringExpenses: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                dayOfMonth: { type: "integer" },
+                label: { type: "string" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "dayOfMonth", "categoryName"],
+            },
+          },
+          recurringIncomes: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                dayOfMonth: { type: "integer" },
+                label: { type: "string" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "dayOfMonth", "categoryName"],
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_ledger_import",
+      description:
+        "Crea de verdad en la cuenta del usuario el lote (categorías, gastos, ingresos y/o recurrentes). Solo cuando el usuario lo pida explícitamente (guardá, creá, registrá, sí dale). Si la categoría no existe, la crea.",
+      parameters: {
+        type: "object",
+        properties: {
+          expenses: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                date: { type: "string" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "date", "categoryName"],
+            },
+          },
+          incomes: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                date: { type: "string" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "date", "categoryName"],
+            },
+          },
+          expenseCategories: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" } },
+              required: ["name"],
+            },
+          },
+          incomeCategories: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" } },
+              required: ["name"],
+            },
+          },
+          recurringExpenses: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                dayOfMonth: { type: "integer" },
+                label: { type: "string" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "dayOfMonth", "categoryName"],
+            },
+          },
+          recurringIncomes: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                dayOfMonth: { type: "integer" },
+                label: { type: "string" },
+                notes: { type: "string" },
+                categoryName: { type: "string" },
+              },
+              required: ["amount", "dayOfMonth", "categoryName"],
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_expense",
+      description:
+        "Registra un gasto puntual. Usala si el usuario pide crear uno solo. Crea la categoría si no existe.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number" },
+          date: { type: "string", description: "YYYY-MM-DD" },
+          notes: { type: "string" },
+          categoryName: { type: "string" },
+        },
+        required: ["amount", "date", "categoryName"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_income",
+      description:
+        "Registra un ingreso puntual. Crea la categoría si no existe.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number" },
+          date: { type: "string", description: "YYYY-MM-DD" },
+          notes: { type: "string" },
+          categoryName: { type: "string" },
+        },
+        required: ["amount", "date", "categoryName"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_expense_category",
+      description: "Crea una categoría de gasto.",
+      parameters: {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_income_category",
+      description: "Crea una categoría de ingreso.",
+      parameters: {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_recurring_expense",
+      description: "Crea un gasto recurrente mensual. Crea la categoría si no existe.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number" },
+          dayOfMonth: { type: "integer" },
+          label: { type: "string" },
+          notes: { type: "string" },
+          categoryName: { type: "string" },
+        },
+        required: ["amount", "dayOfMonth", "categoryName"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_recurring_income",
+      description: "Crea un ingreso recurrente mensual. Crea la categoría si no existe.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number" },
+          dayOfMonth: { type: "integer" },
+          label: { type: "string" },
+          notes: { type: "string" },
+          categoryName: { type: "string" },
+        },
+        required: ["amount", "dayOfMonth", "categoryName"],
+      },
+    },
+  },
 ];
 
 @Injectable()
@@ -157,6 +443,7 @@ export class FinanceAssistantUseCase {
       content: m.content,
       attachmentName: m.attachmentName || undefined,
       extractedDebt: m.extractedDebt ?? null,
+      extractedLedger: (m.extractedLedger as ExtractedLedger | null) ?? null,
       createdAt: new Date(m.createdAt).toISOString(),
     }));
   }
@@ -171,6 +458,7 @@ export class FinanceAssistantUseCase {
   ): Promise<{
     reply: string;
     extractedDebt: Record<string, unknown> | null;
+    extractedLedger: ExtractedLedger | null;
     messages: AssistantMessageDto[];
   }> {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -227,7 +515,11 @@ export class FinanceAssistantUseCase {
       }
       const hint =
         (attachmentName ? `\n[Adjuntos: ${attachmentName}]` : "") +
-        "\nHay varios archivos. Revisalos todos. Si alguno es crédito o deuda, extraé tasa, cuota, saldo y plazo y llamá report_extracted_debt por cada uno.";
+        "\nHay archivos adjuntos. Revisalos todos." +
+        " Si es un extracto de movimientos, extraé cada gasto e ingreso (fecha, monto, descripción) y llamá propose_ledger_import." +
+        " Reutilizá categorías existentes del contexto. Si falta una, proponela." +
+        " No vuelvas a cargar pagos que ya existen como gasto o ingreso recurrente." +
+        " Si alguno es crédito o deuda, extraé tasa, cuota, saldo y plazo y llamá report_extracted_debt por cada uno.";
       const textBlock = [userText + hint, ...texts].filter(Boolean).join("\n\n");
       if (images.length > 0) {
         llmMessages.push({
@@ -241,15 +533,9 @@ export class FinanceAssistantUseCase {
       llmMessages.push({ role: "user", content: userText });
     }
 
-    let extractedDebt: Record<string, unknown> | null = null;
-    const reply = await this.runLlmLoop(
-      userId,
-      llmMessages,
-      apiKey,
-      (debt) => {
-        extractedDebt = debt;
-      }
-    );
+    const extracted: ExtractSink = { debt: null, ledger: emptyLedger() };
+    const reply = await this.runLlmLoop(userId, llmMessages, apiKey, extracted);
+    const ledger = ledgerHasItems(extracted.ledger) ? extracted.ledger : null;
 
     const now = new Date();
     await this.appendMessages(userId, [
@@ -258,20 +544,23 @@ export class FinanceAssistantUseCase {
         content: userText,
         attachmentName,
         extractedDebt: null,
+        extractedLedger: null,
         createdAt: now,
       },
       {
         role: "assistant",
         content: reply,
         attachmentName: "",
-        extractedDebt,
+        extractedDebt: extracted.debt,
+        extractedLedger: ledger,
         createdAt: new Date(),
       },
     ]);
 
     return {
       reply,
-      extractedDebt,
+      extractedDebt: extracted.debt,
+      extractedLedger: ledger,
       messages: await this.history(userId),
     };
   }
@@ -280,8 +569,13 @@ export class FinanceAssistantUseCase {
     return [
       "Sos el asistente de contabilidad personal de OverApp.",
       "Hablás en español (Colombia), claro y concreto. Montos en COP.",
-      "Usá las herramientas para números reales: no inventes saldos, tasas ni fechas de cancelación.",
-      "Si falta un dato (tasa, cuota, saldo), preguntá o pedí un pantallazo.",
+      "Usá las herramientas para números reales: no inventes saldos, tasas ni fechas.",
+      "Podés leer y también escribir en la cuenta del usuario.",
+      "Extractos, PDF o Excel: extraé movimientos y llamá propose_ledger_import (el usuario confirma en la app). No uses apply_ledger_import en el mismo turno del extracto.",
+      "Si el usuario dice explícitamente que cree/guarde/registre, usá apply_ledger_import o create_*.",
+      "Reutilizá categorías existentes (mismo nombre, ignorá mayúsculas y tildes). Si no existe, proponé o creá la categoría.",
+      "No dupliques recurrentes ya listados en el contexto. Un pago de arriendo/internet que ya es recurrente no lo cargues otra vez como gasto suelto salvo que el usuario lo pida.",
+      "Si falta un dato (tasa, cuota, saldo, categoría), preguntá o pedí un pantallazo.",
       "Esto es orientación, no asesoría financiera formal.",
       "Contexto actual del usuario:",
       compactContext,
@@ -293,11 +587,13 @@ export class FinanceAssistantUseCase {
     year: number,
     month: number
   ): Promise<string> {
-    const [summary, debts, recExp, recInc] = await Promise.all([
+    const [summary, debts, recExp, recInc, expCats, incCats] = await Promise.all([
       this.monthlySummary.execute(userId, year, month),
       this.ledger.findDebtsByUser(userId),
       this.ledger.findRecurringExpenseRulesByUser(userId),
       this.ledger.findRecurringIncomeRulesByUser(userId),
+      this.ledger.findExpenseCategoriesByUser(userId),
+      this.ledger.findIncomeCategoriesByUser(userId),
     ]);
 
     const months: { year: number; month: number; income: number; expenses: number }[] =
@@ -330,6 +626,8 @@ export class FinanceAssistantUseCase {
           topIngresos: summary.incomeBreakdown.slice(0, 6),
         },
         historial6Meses: months,
+        categoriasGasto: expCats.map((c) => ({ id: c.id, name: c.name })),
+        categoriasIngreso: incCats.map((c) => ({ id: c.id, name: c.name })),
         deudas: debts.map((d) => d.toJSON()),
         gastosRecurrentes: recExp
           .filter((r) => r.toJSON().isActive)
@@ -363,14 +661,14 @@ export class FinanceAssistantUseCase {
     userId: string,
     messages: ChatApiMessage[],
     apiKey: string,
-    onExtracted: (debt: Record<string, unknown>) => void
+    extracted: ExtractSink
   ): Promise<string> {
     const baseUrl = (
       process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"
     ).replace(/\/$/, "");
     const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
-    for (let step = 0; step < 6; step++) {
+    for (let step = 0; step < 8; step++) {
       const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -413,7 +711,7 @@ export class FinanceAssistantUseCase {
             userId,
             call.function.name,
             call.function.arguments,
-            onExtracted
+            extracted
           );
           messages.push({
             role: "tool",
@@ -434,7 +732,7 @@ export class FinanceAssistantUseCase {
     userId: string,
     name: string,
     rawArgs: string,
-    onExtracted: (debt: Record<string, unknown>) => void
+    extracted: ExtractSink
   ): Promise<string> {
     let args: Record<string, unknown> = {};
     try {
@@ -533,7 +831,7 @@ export class FinanceAssistantUseCase {
     }
 
     if (name === "report_extracted_debt") {
-      const extracted = {
+      const debt = {
         name: String(args.name ?? "Deuda"),
         creditor: String(args.creditor ?? ""),
         balance: Number(args.balance ?? 0),
@@ -549,8 +847,131 @@ export class FinanceAssistantUseCase {
         paidInstallments: Number(args.paidInstallments ?? 0) || 0,
         notes: String(args.notes ?? ""),
       };
-      onExtracted(extracted);
-      return JSON.stringify({ ok: true, extracted });
+      extracted.debt = debt;
+      return JSON.stringify({ ok: true, extracted: debt });
+    }
+
+    if (name === "list_categories") {
+      const [exp, inc] = await Promise.all([
+        this.ledger.findExpenseCategoriesByUser(userId),
+        this.ledger.findIncomeCategoriesByUser(userId),
+      ]);
+      return JSON.stringify({
+        expenseCategories: exp.map((c) => ({ id: c.id, name: c.name })),
+        incomeCategories: inc.map((c) => ({ id: c.id, name: c.name })),
+      });
+    }
+
+    if (name === "propose_ledger_import" || name === "apply_ledger_import") {
+      const [exp, inc] = await Promise.all([
+        this.ledger.findExpenseCategoriesByUser(userId),
+        this.ledger.findIncomeCategoriesByUser(userId),
+      ]);
+      const draft = normalizeProposedLedger(
+        args,
+        exp.map((c) => ({ id: c.id, name: c.name })),
+        inc.map((c) => ({ id: c.id, name: c.name }))
+      );
+      if (!ledgerHasItems(draft)) {
+        return JSON.stringify({
+          ok: false,
+          error: "No hay ítems válidos (falta monto, fecha o categoría)",
+        });
+      }
+      extracted.ledger = mergeLedgers(extracted.ledger, draft);
+      if (name === "propose_ledger_import") {
+        return JSON.stringify({
+          ok: true,
+          proposed: true,
+          counts: {
+            expenses: draft.expenses.length,
+            incomes: draft.incomes.length,
+            expenseCategories: draft.expenseCategories.length,
+            incomeCategories: draft.incomeCategories.length,
+            recurringExpenses: draft.recurringExpenses.length,
+            recurringIncomes: draft.recurringIncomes.length,
+          },
+          note: "El usuario verá una tabla para confirmar. No guardaste nada todavía.",
+        });
+      }
+      const result = await applyLedgerImport(this.ledger, userId, draft);
+      return JSON.stringify({ ok: true, applied: true, ...result });
+    }
+
+    if (name === "create_expense" || name === "create_income") {
+      const date = parseDay(args.date ?? args.occurredAt ?? args.receivedAt);
+      const amount = Number(args.amount);
+      const categoryName = String(args.categoryName ?? "").trim();
+      if (!date || !Number.isFinite(amount) || amount <= 0 || !categoryName) {
+        return JSON.stringify({
+          error: "Faltan amount, date (YYYY-MM-DD) o categoryName",
+        });
+      }
+      const draft =
+        name === "create_expense"
+          ? {
+              ...emptyLedger(),
+              expenses: [
+                {
+                  amount: Math.round(amount),
+                  date,
+                  notes: String(args.notes ?? "").trim(),
+                  categoryName,
+                  categoryId: null,
+                },
+              ],
+            }
+          : {
+              ...emptyLedger(),
+              incomes: [
+                {
+                  amount: Math.round(amount),
+                  date,
+                  notes: String(args.notes ?? "").trim(),
+                  categoryName,
+                  categoryId: null,
+                },
+              ],
+            };
+      const result = await applyLedgerImport(this.ledger, userId, draft);
+      return JSON.stringify({ ok: true, ...result });
+    }
+
+    if (name === "create_expense_category" || name === "create_income_category") {
+      const catName = String(args.name ?? "").trim().slice(0, 80);
+      if (!catName) return JSON.stringify({ error: "Falta name" });
+      const result = await applyLedgerImport(
+        this.ledger,
+        userId,
+        name === "create_expense_category"
+          ? { ...emptyLedger(), expenseCategories: [{ name: catName }] }
+          : { ...emptyLedger(), incomeCategories: [{ name: catName }] }
+      );
+      return JSON.stringify({ ok: true, ...result });
+    }
+
+    if (name === "create_recurring_expense" || name === "create_recurring_income") {
+      const amount = Number(args.amount);
+      const categoryName = String(args.categoryName ?? "").trim();
+      if (!Number.isFinite(amount) || amount <= 0 || !categoryName) {
+        return JSON.stringify({ error: "Faltan amount o categoryName" });
+      }
+      const row = {
+        amount: Math.round(amount),
+        dayOfMonth: Number(args.dayOfMonth ?? 1) || 1,
+        label: String(args.label ?? categoryName).trim().slice(0, 120),
+        notes: String(args.notes ?? "").trim(),
+        categoryName,
+        categoryId: null,
+      };
+      const result = await applyLedgerImport(
+        this.ledger,
+        userId,
+        name === "create_recurring_expense"
+          ? { ...emptyLedger(), recurringExpenses: [row] }
+          : { ...emptyLedger(), recurringIncomes: [row] }
+      );
+      return JSON.stringify({ ok: true, ...result });
     }
 
     return JSON.stringify({ error: `Herramienta desconocida: ${name}` });
@@ -563,6 +984,7 @@ export class FinanceAssistantUseCase {
       content: string;
       attachmentName: string;
       extractedDebt: Record<string, unknown> | null;
+      extractedLedger: ExtractedLedger | null;
       createdAt: Date;
     }>
   ) {

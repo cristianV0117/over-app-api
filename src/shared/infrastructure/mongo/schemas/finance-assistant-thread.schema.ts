@@ -17,6 +17,9 @@ export class FinanceAssistantMessageModel {
   @Prop({ type: Object, default: null })
   extractedDebt!: Record<string, unknown> | null;
 
+  @Prop({ type: Object, default: null })
+  extractedLedger!: Record<string, unknown> | null;
+
   @Prop({ type: Date, default: () => new Date() })
   createdAt!: Date;
 }
