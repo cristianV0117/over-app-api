@@ -9,6 +9,7 @@ import { MailerModule } from "@nestjs-modules/mailer";
 import { TasksModule } from "./tasks/infrastructure/modules/tasks.module";
 import { FinanceModule } from "./finance/infrastructure/modules/finance.module";
 import { CronModule } from "./cron/infrastructure/modules/cron.module";
+import { PayLinksModule } from "./pay-links/infrastructure/modules/pay-links.module";
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { CronModule } from "./cron/infrastructure/modules/cron.module";
     TasksModule,
     FinanceModule,
     CronModule,
+    PayLinksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
