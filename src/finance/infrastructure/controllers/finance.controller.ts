@@ -10,8 +10,10 @@ import {
   Put,
   Query,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
+import type { Response } from "express";
 import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
 import { RequestWithUser } from "src/shared/infrastructure/types/request-with-user.type";
 import { FinanceMonthQueryDto } from "../dtos/finance-month-query.dto";
@@ -54,6 +56,16 @@ import { FinanceRecurringIncomesUpdateUseCase } from "src/finance/application/fi
 import { FinanceMonthlySummaryUseCase } from "src/finance/application/finance-monthly-summary.useCase";
 import { FinanceLiquidityPutDto } from "../dtos/finance-liquidity-put.dto";
 import { FinanceLiquidityReplaceUseCase } from "src/finance/application/finance-liquidity-replace.useCase";
+import { FinanceDebtStoreDto } from "../dtos/finance-debt-store.dto";
+import { FinanceDebtUpdateDto } from "../dtos/finance-debt-update.dto";
+import { FinanceExportQueryDto } from "../dtos/finance-export-query.dto";
+import { FinanceAssistantChatDto } from "../dtos/finance-assistant-chat.dto";
+import { FinanceDebtsIndexUseCase } from "src/finance/application/finance-debts-index.useCase";
+import { FinanceDebtsStoreUseCase } from "src/finance/application/finance-debts-store.useCase";
+import { FinanceDebtsUpdateUseCase } from "src/finance/application/finance-debts-update.useCase";
+import { FinanceDebtsDeleteUseCase } from "src/finance/application/finance-debts-delete.useCase";
+import { FinanceExportUseCase } from "src/finance/application/finance-export.useCase";
+import { FinanceAssistantUseCase } from "src/finance/application/finance-assistant.useCase";
 
 @Controller("finance")
 export class FinanceController {
@@ -83,7 +95,13 @@ export class FinanceController {
     private readonly recurringIncomesUpdate: FinanceRecurringIncomesUpdateUseCase,
     private readonly recurringIncomesDelete: FinanceRecurringIncomesDeleteUseCase,
     private readonly monthlySummary: FinanceMonthlySummaryUseCase,
-    private readonly liquidityReplace: FinanceLiquidityReplaceUseCase
+    private readonly liquidityReplace: FinanceLiquidityReplaceUseCase,
+    private readonly debtsIndex: FinanceDebtsIndexUseCase,
+    private readonly debtsStore: FinanceDebtsStoreUseCase,
+    private readonly debtsUpdate: FinanceDebtsUpdateUseCase,
+    private readonly debtsDelete: FinanceDebtsDeleteUseCase,
+    private readonly financeExport: FinanceExportUseCase,
+    private readonly assistant: FinanceAssistantUseCase
   ) {}
 
   @Put("liquidity")
@@ -370,5 +388,89 @@ export class FinanceController {
   ) {
     await this.recurringIncomesDelete.execute(id, req.user.id);
     return { ok: true };
+  }
+
+  @Get("debts")
+  @UseGuards(JwtAuthGuard)
+  async debtsList(@Req() req: RequestWithUser) {
+    const list = await this.debtsIndex.execute(req.user.id);
+    return list.map((d) => d.toJSON());
+  }
+
+  @Post("debts")
+  @UseGuards(JwtAuthGuard)
+  async debtsPost(
+    @Body() body: FinanceDebtStoreDto,
+    @Req() req: RequestWithUser
+  ) {
+    const d = await this.debtsStore.execute(body, req.user.id);
+    return d.toJSON();
+  }
+
+  @Patch("debts/:id")
+  @UseGuards(JwtAuthGuard)
+  async debtsPatch(
+    @Param("id") id: string,
+    @Body() body: FinanceDebtUpdateDto,
+    @Req() req: RequestWithUser
+  ) {
+    const d = await this.debtsUpdate.execute(id, body, req.user.id);
+    return d.toJSON();
+  }
+
+  @Delete("debts/:id")
+  @UseGuards(JwtAuthGuard)
+  async debtsRemove(@Param("id") id: string, @Req() req: RequestWithUser) {
+    await this.debtsDelete.execute(id, req.user.id);
+    return { ok: true };
+  }
+
+  @Get("export")
+  @UseGuards(JwtAuthGuard)
+  async exportMovements(
+    @Query() query: FinanceExportQueryDto,
+    @Req() req: RequestWithUser,
+    @Res() res: Response
+  ) {
+    const rows = await this.financeExport.execute(
+      req.user.id,
+      query.fromYear,
+      query.fromMonth,
+      query.toYear,
+      query.toMonth
+    );
+    if (query.format === "json") {
+      return res.json({ rows });
+    }
+    const csv = this.financeExport.toCsv(rows);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="movimientos-${query.fromYear}-${String(query.fromMonth).padStart(2, "0")}-${query.toYear}-${String(query.toMonth).padStart(2, "0")}.csv"`
+    );
+    return res.send(csv);
+  }
+
+  @Get("assistant/history")
+  @UseGuards(JwtAuthGuard)
+  async assistantHistory(@Req() req: RequestWithUser) {
+    const messages = await this.assistant.history(req.user.id);
+    return { messages };
+  }
+
+  @Delete("assistant/history")
+  @UseGuards(JwtAuthGuard)
+  async assistantClear(@Req() req: RequestWithUser) {
+    await this.assistant.clear(req.user.id);
+    return { ok: true };
+  }
+
+  @Post("assistant/chat")
+  @UseGuards(JwtAuthGuard)
+  async assistantChat(
+    @Body() body: FinanceAssistantChatDto,
+    @Req() req: RequestWithUser
+  ) {
+    return this.assistant.chat(req.user.id, body);
   }
 }

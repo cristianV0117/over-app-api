@@ -1,9 +1,27 @@
 import { ExpenseCategory } from "../expense-category";
+import { FinanceDebt } from "../finance-debt";
+import type { FinanceInterestRateType } from "../dtos/finance-debt.dto";
 import { FinanceExpense } from "../finance-expense";
 import { FinanceRecurringExpense } from "../finance-recurring-expense";
 import { FinanceRecurringIncome } from "../finance-recurring-income";
 import { IncomeCategory } from "../income-category";
 import { FinanceIncomeLine } from "../finance-income-line";
+
+export type FinanceDebtWrite = {
+  name: string;
+  creditor?: string;
+  balance: number;
+  principal?: number;
+  interestRate: number;
+  interestRateType: FinanceInterestRateType;
+  installmentAmount: number;
+  dayOfMonth: number;
+  totalInstallments?: number | null;
+  paidInstallments?: number;
+  startDate?: Date | null;
+  notes?: string;
+  isActive?: boolean;
+};
 
 export type FinanceCategoryDeleteResult =
   | "deleted"
@@ -172,4 +190,13 @@ export interface FinanceLedgerRepository {
     month: number,
     received: boolean
   ): Promise<void>;
+
+  findDebtsByUser(userId: string): Promise<FinanceDebt[]>;
+  createDebt(userId: string, data: FinanceDebtWrite): Promise<FinanceDebt>;
+  updateDebt(
+    userId: string,
+    id: string,
+    patch: Partial<FinanceDebtWrite>
+  ): Promise<FinanceDebt | null>;
+  deleteDebt(userId: string, id: string): Promise<boolean>;
 }
