@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
 import { AdminGuard } from "src/shared/infrastructure/guards/admin.guard";
 import { RequestWithUser } from "src/shared/infrastructure/types/request-with-user.type";
@@ -30,6 +30,11 @@ export class CronController {
   ) {
     const limit = limitStr ? Number(limitStr) : 80;
     return { logs: await this.cron.listLogs(req.user.id, limit) };
+  }
+
+  @Delete("logs")
+  async clearLogs(@Req() req: RequestWithUser) {
+    return this.cron.clearLogs(req.user.id);
   }
 
   @Post("run")

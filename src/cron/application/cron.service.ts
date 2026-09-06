@@ -80,6 +80,13 @@ export class CronJobsService {
     return this.toConfigDto(doc ?? current);
   }
 
+  async clearLogs(userId: string): Promise<{ deleted: number }> {
+    const res = await this.logModel
+      .deleteMany({ userId: new Types.ObjectId(userId) })
+      .exec();
+    return { deleted: res.deletedCount ?? 0 };
+  }
+
   async listLogs(userId: string, limit = 80): Promise<CronLogDto[]> {
     const docs = await this.logModel
       .find({ userId: new Types.ObjectId(userId) })
