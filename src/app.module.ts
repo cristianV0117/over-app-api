@@ -8,6 +8,7 @@ import { UsersModule } from "./users/infrastructure/modules/users.module";
 import { MailerModule } from "@nestjs-modules/mailer";
 import { TasksModule } from "./tasks/infrastructure/modules/tasks.module";
 import { FinanceModule } from "./finance/infrastructure/modules/finance.module";
+import { CronModule } from "./cron/infrastructure/modules/cron.module";
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { FinanceModule } from "./finance/infrastructure/modules/finance.module";
     UsersModule,
     TasksModule,
     FinanceModule,
+    CronModule,
   ],
   controllers: [AppController],
   providers: [AppService],
