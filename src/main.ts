@@ -7,8 +7,8 @@ import { join } from "path";
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.useBodyParser("json", { limit: "8mb" });
-  app.useBodyParser("urlencoded", { limit: "8mb", extended: true });
+  app.useBodyParser("json", { limit: "24mb" });
+  app.useBodyParser("urlencoded", { limit: "24mb", extended: true });
   app.enableCors({
     origin: process.env.FRONTEND_URL, // frontend
     credentials: true,
