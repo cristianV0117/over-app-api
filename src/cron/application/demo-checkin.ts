@@ -89,3 +89,26 @@ export function runCheckIn(): Promise<{
     req.end();
   });
 }
+
+export type CheckInResult = Awaited<ReturnType<typeof runCheckIn>>;
+
+export const runDemoCheckIn = runCheckIn;
+
+export function formatDemoCheckInLog(
+  result: CheckInResult,
+  opts?: { delaySeconds?: number }
+): string {
+  const delay =
+    opts?.delaySeconds && opts.delaySeconds > 0
+      ? ` (delay ${opts.delaySeconds}s)`
+      : "";
+  const ok = result.statusCode >= 200 && result.statusCode < 300;
+  return [
+    ok ? "RESULTADO: petición HTTP exitosa" : `RESULTADO: HTTP ${result.statusCode}`,
+    `Método: ${result.method}`,
+    `URL: ${result.url}`,
+    `Body: ${result.body}`,
+    `Duración: ${result.durationMs} ms${delay}`,
+    `Respuesta: ${result.response}`,
+  ].join("\n");
+}
