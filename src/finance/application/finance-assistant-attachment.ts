@@ -1,6 +1,20 @@
 import { BadRequestException } from "@nestjs/common";
 import * as XLSX from "xlsx";
-import pdfParse from "pdf-parse";
+
+type PdfParseFn = (buffer: Buffer) => Promise<{ text: string }>;
+
+function loadPdfParse(): PdfParseFn {
+  // pdf-parse es CommonJS; import default queda como .default undefined en Nest.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require("pdf-parse") as PdfParseFn | { default: PdfParseFn };
+  const fn = typeof mod === "function" ? mod : mod.default;
+  if (typeof fn !== "function") {
+    throw new Error("pdf-parse no se pudo cargar");
+  }
+  return fn;
+}
+
+const pdfParse = loadPdfParse();
 
 export const ASSISTANT_IMAGE_TYPES = new Set([
   "image/jpeg",
