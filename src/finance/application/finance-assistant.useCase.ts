@@ -45,6 +45,23 @@ type ExtractSink = {
   applied: boolean;
 };
 
+function normalizeDebtArgs(args: Record<string, unknown>) {
+  return {
+    name: String(args.name ?? "Crédito"),
+    creditor: String(args.creditor ?? ""),
+    balance: Number(args.balance ?? 0),
+    principal: Number(args.principal ?? args.balance ?? 0),
+    interestRate: Number(args.interestRate ?? 0),
+    interestRateType: args.interestRateType === "EA" ? "EA" : "NM",
+    installmentAmount: Number(args.installmentAmount ?? 0),
+    dayOfMonth: Number(args.dayOfMonth ?? 1) || 1,
+    totalInstallments:
+      args.totalInstallments != null ? Number(args.totalInstallments) : null,
+    paidInstallments: Number(args.paidInstallments ?? 0) || 0,
+    notes: String(args.notes ?? ""),
+  };
+}
+
 type ChatToolCall = {
   id: string;
   function: { name: string; arguments: string };
@@ -132,6 +149,31 @@ const TOOLS = [
       name: "report_extracted_debt",
       description:
         "Cuando el usuario adjuntó un pantallazo de un crédito/deuda, reporta los campos extraídos para que pueda confirmarlos.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          creditor: { type: "string" },
+          balance: { type: "number" },
+          principal: { type: "number" },
+          interestRate: { type: "number" },
+          interestRateType: { type: "string", enum: ["NM", "EA"] },
+          installmentAmount: { type: "number" },
+          dayOfMonth: { type: "integer" },
+          totalInstallments: { type: "integer" },
+          paidInstallments: { type: "integer" },
+          notes: { type: "string" },
+        },
+        required: ["name", "balance", "interestRate", "interestRateType", "installmentAmount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_debt",
+      description:
+        "Crea el crédito/deuda en la cuenta. Usala si el usuario pidió registrarlo o si del documento se ven saldo, cuota y tasa claros.",
       parameters: {
         type: "object",
         properties: {
@@ -521,7 +563,7 @@ export class FinanceAssistantUseCase {
         " Si es un extracto de movimientos, extraé cada gasto e ingreso (fecha, monto, descripción) y llamá propose_ledger_import." +
         " Reutilizá categorías existentes del contexto. Si falta una, proponela." +
         " No vuelvas a cargar pagos que ya existen como gasto o ingreso recurrente." +
-        " Si alguno es crédito o deuda, extraé tasa, cuota, saldo y plazo y llamá report_extracted_debt por cada uno.";
+        " Si alguno es crédito, préstamo o deuda (saldo, cuota, tasa), extraé los campos y llamá create_debt para registrarlo. Si un dato clave no se ve, usá report_extracted_debt para que el usuario confirme.";
       const textBlock = [userText + hint, ...texts].filter(Boolean).join("\n\n");
       if (images.length > 0) {
         llmMessages.push({
@@ -585,6 +627,7 @@ export class FinanceAssistantUseCase {
       "Si el usuario dice explícitamente que cree/guarde/registre un lote del extracto, usá apply_ledger_import.",
       "Reutilizá categorías existentes (mismo nombre, ignorá mayúsculas y tildes). Si no existe, proponé o creá la categoría.",
       "No dupliques recurrentes ya listados en el contexto. Un pago de arriendo/internet que ya es recurrente no lo cargues otra vez como gasto suelto salvo que el usuario lo pida.",
+      "Pantallazo o PDF de un crédito: extraé nombre, entidad, saldo, cuota, tasa (NM o EA) y día de cobro. Si se ve claro, create_debt. Si falta tasa o cuota, report_extracted_debt.",
       "Si falta un dato (tasa, cuota, saldo, categoría), preguntá o pedí un pantallazo.",
       "Esto es orientación, no asesoría financiera formal.",
       "Contexto actual del usuario:",
@@ -843,25 +886,36 @@ export class FinanceAssistantUseCase {
       return JSON.stringify(simulateDebtPlan(active, extraBudget, strategy));
     }
 
-    if (name === "report_extracted_debt") {
-      const debt = {
-        name: String(args.name ?? "Deuda"),
-        creditor: String(args.creditor ?? ""),
-        balance: Number(args.balance ?? 0),
-        principal: Number(args.principal ?? args.balance ?? 0),
-        interestRate: Number(args.interestRate ?? 0),
-        interestRateType: args.interestRateType === "EA" ? "EA" : "NM",
-        installmentAmount: Number(args.installmentAmount ?? 0),
-        dayOfMonth: Number(args.dayOfMonth ?? 1) || 1,
+    if (name === "report_extracted_debt" || name === "create_debt") {
+      const debt = normalizeDebtArgs(args);
+      if (name === "report_extracted_debt") {
+        extracted.debt = debt;
+        return JSON.stringify({ ok: true, extracted: debt });
+      }
+      if (!debt.balance || !debt.installmentAmount || !debt.name) {
+        return JSON.stringify({
+          error: "Faltan name, balance o installmentAmount",
+        });
+      }
+      const created = await this.ledger.createDebt(userId, {
+        name: debt.name,
+        creditor: debt.creditor || undefined,
+        balance: Number(debt.balance),
+        principal: Number(debt.principal ?? debt.balance),
+        interestRate: Number(debt.interestRate ?? 0),
+        interestRateType: debt.interestRateType === "EA" ? "EA" : "NM",
+        installmentAmount: Number(debt.installmentAmount),
+        dayOfMonth: Number(debt.dayOfMonth ?? 1) || 1,
         totalInstallments:
-          args.totalInstallments != null
-            ? Number(args.totalInstallments)
+          debt.totalInstallments != null
+            ? Number(debt.totalInstallments)
             : null,
-        paidInstallments: Number(args.paidInstallments ?? 0) || 0,
-        notes: String(args.notes ?? ""),
-      };
-      extracted.debt = debt;
-      return JSON.stringify({ ok: true, extracted: debt });
+        paidInstallments: Number(debt.paidInstallments ?? 0) || 0,
+        notes: String(debt.notes ?? ""),
+        isActive: true,
+      });
+      extracted.applied = true;
+      return JSON.stringify({ ok: true, created: created.toJSON() });
     }
 
     if (name === "list_categories") {
