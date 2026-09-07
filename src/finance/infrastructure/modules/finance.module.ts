@@ -81,6 +81,8 @@ import { FinanceDebtsUpdateUseCase } from "src/finance/application/finance-debts
 import { FinanceDebtsDeleteUseCase } from "src/finance/application/finance-debts-delete.useCase";
 import { FinanceExportUseCase } from "src/finance/application/finance-export.useCase";
 import { FinanceAssistantUseCase } from "src/finance/application/finance-assistant.useCase";
+import { FinanceRangeOverviewUseCase } from "src/finance/application/finance-range-overview.useCase";
+import { FinanceDebtsForecastUseCase } from "src/finance/application/finance-debts-forecast.useCase";
 
 @Module({
   imports: [
@@ -166,6 +168,8 @@ import { FinanceAssistantUseCase } from "src/finance/application/finance-assista
     FinanceDebtsDeleteUseCase,
     FinanceExportUseCase,
     FinanceAssistantUseCase,
+    FinanceRangeOverviewUseCase,
+    FinanceDebtsForecastUseCase,
   ],
 })
 export class FinanceModule {}
