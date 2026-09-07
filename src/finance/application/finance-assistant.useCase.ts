@@ -42,6 +42,7 @@ export type AssistantMessageDto = {
 type ExtractSink = {
   debt: Record<string, unknown> | null;
   ledger: ExtractedLedger;
+  applied: boolean;
 };
 
 type ChatToolCall = {
@@ -459,6 +460,7 @@ export class FinanceAssistantUseCase {
     reply: string;
     extractedDebt: Record<string, unknown> | null;
     extractedLedger: ExtractedLedger | null;
+    applied: boolean;
     messages: AssistantMessageDto[];
   }> {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -533,7 +535,11 @@ export class FinanceAssistantUseCase {
       llmMessages.push({ role: "user", content: userText });
     }
 
-    const extracted: ExtractSink = { debt: null, ledger: emptyLedger() };
+    const extracted: ExtractSink = {
+      debt: null,
+      ledger: emptyLedger(),
+      applied: false,
+    };
     const reply = await this.runLlmLoop(userId, llmMessages, apiKey, extracted);
     const ledger = ledgerHasItems(extracted.ledger) ? extracted.ledger : null;
 
@@ -561,6 +567,7 @@ export class FinanceAssistantUseCase {
       reply,
       extractedDebt: extracted.debt,
       extractedLedger: ledger,
+      applied: extracted.applied,
       messages: await this.history(userId),
     };
   }
@@ -571,8 +578,11 @@ export class FinanceAssistantUseCase {
       "Hablás en español (Colombia), claro y concreto. Montos en COP.",
       "Usá las herramientas para números reales: no inventes saldos, tasas ni fechas.",
       "Podés leer y también escribir en la cuenta del usuario.",
+      "Si el usuario dice que HOY (o una fecha) gastó/pagó/compró o le entró plata, REGISTRALO YA con apply_ledger_import o create_expense/create_income. No pidas confirmación ni uses propose_ledger_import en ese caso.",
+      "Ejemplo: «hoy gasté 20 mil en gasolina y 50 mil en mercado» → dos gastos con fecha = hoy del contexto, categorías Gasolina/Mercado (o las que existan más parecidas).",
+      "Montos en Colombia: «20 mil» = 20000, «1.2 millones» = 1200000. Fecha por defecto: el campo hoy del contexto.",
       "Extractos, PDF o Excel: extraé movimientos y llamá propose_ledger_import (el usuario confirma en la app). No uses apply_ledger_import en el mismo turno del extracto.",
-      "Si el usuario dice explícitamente que cree/guarde/registre, usá apply_ledger_import o create_*.",
+      "Si el usuario dice explícitamente que cree/guarde/registre un lote del extracto, usá apply_ledger_import.",
       "Reutilizá categorías existentes (mismo nombre, ignorá mayúsculas y tildes). Si no existe, proponé o creá la categoría.",
       "No dupliques recurrentes ya listados en el contexto. Un pago de arriendo/internet que ya es recurrente no lo cargues otra vez como gasto suelto salvo que el usuario lo pida.",
       "Si falta un dato (tasa, cuota, saldo, categoría), preguntá o pedí un pantallazo.",
@@ -616,6 +626,9 @@ export class FinanceAssistantUseCase {
 
     return JSON.stringify(
       {
+        hoy: new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/Bogota",
+        }).format(new Date()),
         mesConsultado: { year, month },
         mesActual: {
           ingresos: summary.income,
@@ -878,8 +891,8 @@ export class FinanceAssistantUseCase {
           error: "No hay ítems válidos (falta monto, fecha o categoría)",
         });
       }
-      extracted.ledger = mergeLedgers(extracted.ledger, draft);
       if (name === "propose_ledger_import") {
+        extracted.ledger = mergeLedgers(extracted.ledger, draft);
         return JSON.stringify({
           ok: true,
           proposed: true,
@@ -895,6 +908,7 @@ export class FinanceAssistantUseCase {
         });
       }
       const result = await applyLedgerImport(this.ledger, userId, draft);
+      extracted.applied = true;
       return JSON.stringify({ ok: true, applied: true, ...result });
     }
 
@@ -934,7 +948,8 @@ export class FinanceAssistantUseCase {
               ],
             };
       const result = await applyLedgerImport(this.ledger, userId, draft);
-      return JSON.stringify({ ok: true, ...result });
+      extracted.applied = true;
+      return JSON.stringify({ ok: true, applied: true, ...result });
     }
 
     if (name === "create_expense_category" || name === "create_income_category") {
@@ -947,7 +962,8 @@ export class FinanceAssistantUseCase {
           ? { ...emptyLedger(), expenseCategories: [{ name: catName }] }
           : { ...emptyLedger(), incomeCategories: [{ name: catName }] }
       );
-      return JSON.stringify({ ok: true, ...result });
+      extracted.applied = true;
+      return JSON.stringify({ ok: true, applied: true, ...result });
     }
 
     if (name === "create_recurring_expense" || name === "create_recurring_income") {
@@ -971,7 +987,8 @@ export class FinanceAssistantUseCase {
           ? { ...emptyLedger(), recurringExpenses: [row] }
           : { ...emptyLedger(), recurringIncomes: [row] }
       );
-      return JSON.stringify({ ok: true, ...result });
+      extracted.applied = true;
+      return JSON.stringify({ ok: true, applied: true, ...result });
     }
 
     return JSON.stringify({ error: `Herramienta desconocida: ${name}` });

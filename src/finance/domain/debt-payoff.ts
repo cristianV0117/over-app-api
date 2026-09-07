@@ -9,6 +9,15 @@ export type DebtPayoffInput = {
   extraMonthly?: number;
 };
 
+export type DebtPayoffStep = {
+  month: number;
+  date: string;
+  payment: number;
+  interest: number;
+  principal: number;
+  balance: number;
+};
+
 export type DebtPayoffResult = {
   name: string;
   months: number;
@@ -18,6 +27,7 @@ export type DebtPayoffResult = {
   totalInterest: number;
   extraMonthly: number;
   monthlyRate: number;
+  schedule: DebtPayoffStep[];
 };
 
 /** Tasa mensual en decimal (ej. 0.018). NM = % mensual; EA = % efectiva anual. */
@@ -52,6 +62,8 @@ export function simulateDebtPayoff(
   let totalInterest = 0;
   const maxMonths = 600;
 
+  const schedule: DebtPayoffStep[] = [];
+
   if (balance <= 0) {
     return {
       name: input.name,
@@ -62,6 +74,7 @@ export function simulateDebtPayoff(
       totalInterest: 0,
       extraMonthly: extra,
       monthlyRate: r,
+      schedule,
     };
   }
 
@@ -75,6 +88,7 @@ export function simulateDebtPayoff(
       totalInterest: 0,
       extraMonthly: extra,
       monthlyRate: r,
+      schedule,
     };
   }
 
@@ -91,6 +105,7 @@ export function simulateDebtPayoff(
         totalInterest: Math.round(totalInterest),
         extraMonthly: extra,
         monthlyRate: r,
+        schedule,
       };
     }
     if (principal > balance) principal = balance;
@@ -99,6 +114,14 @@ export function simulateDebtPayoff(
     totalPaid += paid;
     totalInterest += interest;
     months += 1;
+    schedule.push({
+      month: months,
+      date: addMonthsYmd(from, months),
+      payment: Math.round(paid),
+      interest: Math.round(interest),
+      principal: Math.round(principal),
+      balance: Math.round(Math.max(0, balance)),
+    });
   }
 
   return {
@@ -110,6 +133,7 @@ export function simulateDebtPayoff(
     totalInterest: Math.round(totalInterest),
     extraMonthly: extra,
     monthlyRate: r,
+    schedule,
   };
 }
 

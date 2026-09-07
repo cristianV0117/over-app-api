@@ -66,6 +66,10 @@ import { FinanceDebtsUpdateUseCase } from "src/finance/application/finance-debts
 import { FinanceDebtsDeleteUseCase } from "src/finance/application/finance-debts-delete.useCase";
 import { FinanceExportUseCase } from "src/finance/application/finance-export.useCase";
 import { FinanceAssistantUseCase } from "src/finance/application/finance-assistant.useCase";
+import { FinanceRangeOverviewUseCase } from "src/finance/application/finance-range-overview.useCase";
+import { FinanceDebtsForecastUseCase } from "src/finance/application/finance-debts-forecast.useCase";
+import { FinanceOverviewQueryDto } from "../dtos/finance-overview-query.dto";
+import { FinanceDebtForecastQueryDto } from "../dtos/finance-debt-forecast-query.dto";
 
 @Controller("finance")
 export class FinanceController {
@@ -101,7 +105,9 @@ export class FinanceController {
     private readonly debtsUpdate: FinanceDebtsUpdateUseCase,
     private readonly debtsDelete: FinanceDebtsDeleteUseCase,
     private readonly financeExport: FinanceExportUseCase,
-    private readonly assistant: FinanceAssistantUseCase
+    private readonly assistant: FinanceAssistantUseCase,
+    private readonly rangeOverview: FinanceRangeOverviewUseCase,
+    private readonly debtsForecast: FinanceDebtsForecastUseCase
   ) {}
 
   @Put("liquidity")
@@ -126,6 +132,20 @@ export class FinanceController {
     @Req() req: RequestWithUser
   ) {
     return this.monthlySummary.execute(req.user.id, query.year, query.month);
+  }
+
+  @Get("overview")
+  @UseGuards(JwtAuthGuard)
+  async overview(
+    @Query() query: FinanceOverviewQueryDto,
+    @Req() req: RequestWithUser
+  ) {
+    return this.rangeOverview.execute(
+      req.user.id,
+      query.year,
+      query.month,
+      query.months ?? 12
+    );
   }
 
   @Get("income-categories")
@@ -395,6 +415,19 @@ export class FinanceController {
   async debtsList(@Req() req: RequestWithUser) {
     const list = await this.debtsIndex.execute(req.user.id);
     return list.map((d) => d.toJSON());
+  }
+
+  @Get("debts/forecast")
+  @UseGuards(JwtAuthGuard)
+  async debtsForecastGet(
+    @Query() query: FinanceDebtForecastQueryDto,
+    @Req() req: RequestWithUser
+  ) {
+    return this.debtsForecast.execute(
+      req.user.id,
+      query.extraMonthly ?? 0,
+      query.debtId
+    );
   }
 
   @Post("debts")
