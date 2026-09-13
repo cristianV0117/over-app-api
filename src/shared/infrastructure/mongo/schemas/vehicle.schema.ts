@@ -68,7 +68,7 @@ export class VehicleModel {
   @Prop({ default: "", trim: true, maxlength: 80 })
   model!: string;
 
-  @Prop({ required: false })
+  @Prop({ type: Number, required: false })
   year?: number;
 
   @Prop({ default: "", trim: true, maxlength: 40 })
@@ -77,10 +77,10 @@ export class VehicleModel {
   @Prop({ default: "", trim: true, maxlength: 400 })
   notes!: string;
 
-  @Prop({ required: false, min: 0, max: 2_000_000 })
+  @Prop({ type: Number, required: false, min: 0, max: 2_000_000 })
   odometerKm?: number | null;
 
-  @Prop({ required: false, min: 0, max: 40 })
+  @Prop({ type: Number, required: false, min: 0, max: 40 })
   yearsOwned?: number | null;
 
   @Prop({ required: false, type: Date })
