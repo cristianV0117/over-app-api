@@ -9,6 +9,7 @@ export const VEHICLE_DOC_KINDS = [
   "tecnomecanica",
   "tarjetaPropiedad",
   "licencia",
+  "manual",
 ] as const;
 export type VehicleDocKind = (typeof VEHICLE_DOC_KINDS)[number];
 
@@ -43,6 +44,9 @@ export class VehicleDocuments {
 
   @Prop({ type: VehicleDocumentFileSchema, required: false })
   licencia?: VehicleDocumentFile;
+
+  @Prop({ type: VehicleDocumentFileSchema, required: false })
+  manual?: VehicleDocumentFile;
 }
 
 const VehicleDocumentsSchema = SchemaFactory.createForClass(VehicleDocuments);
@@ -72,6 +76,12 @@ export class VehicleModel {
 
   @Prop({ default: "", trim: true, maxlength: 400 })
   notes!: string;
+
+  @Prop({ required: false, min: 0, max: 2_000_000 })
+  odometerKm?: number | null;
+
+  @Prop({ required: false, min: 0, max: 40 })
+  yearsOwned?: number | null;
 
   @Prop({ required: false, type: Date })
   soatExpiresAt?: Date | null;
