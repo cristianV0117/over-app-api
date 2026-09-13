@@ -10,6 +10,7 @@ import { TasksModule } from "./tasks/infrastructure/modules/tasks.module";
 import { FinanceModule } from "./finance/infrastructure/modules/finance.module";
 import { CronModule } from "./cron/infrastructure/modules/cron.module";
 import { PayLinksModule } from "./pay-links/infrastructure/modules/pay-links.module";
+import { VehiclesModule } from "./vehicles/infrastructure/modules/vehicles.module";
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PayLinksModule } from "./pay-links/infrastructure/modules/pay-links.mod
     FinanceModule,
     CronModule,
     PayLinksModule,
+    VehiclesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
