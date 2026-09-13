@@ -52,6 +52,20 @@ export class VehicleCreateDto {
   notes?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2_000_000)
+  odometerKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(40)
+  yearsOwned?: number;
+
+  @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== "")
   @IsDateString()
   soatExpiresAt?: string | null;
@@ -104,6 +118,20 @@ export class VehicleUpdateDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2_000_000)
+  odometerKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(40)
+  yearsOwned?: number;
 
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== "")

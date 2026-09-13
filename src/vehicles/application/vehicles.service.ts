@@ -37,6 +37,8 @@ export type VehicleDto = {
   year: number | null;
   color: string;
   notes: string;
+  odometerKm: number | null;
+  yearsOwned: number | null;
   soatExpiresAt: string | null;
   technoExpiresAt: string | null;
   licenseExpiresAt: string | null;
@@ -45,6 +47,7 @@ export type VehicleDto = {
     tecnomecanica: VehicleFileDto | null;
     tarjetaPropiedad: VehicleFileDto | null;
     licencia: VehicleFileDto | null;
+    manual: VehicleFileDto | null;
   };
   createdAt: string;
 };
@@ -84,6 +87,8 @@ export class VehiclesService {
       year: body.year,
       color: body.color?.trim() ?? "",
       notes: body.notes?.trim() ?? "",
+      odometerKm: body.odometerKm,
+      yearsOwned: body.yearsOwned,
       soatExpiresAt: this.parseDate(body.soatExpiresAt),
       technoExpiresAt: this.parseDate(body.technoExpiresAt),
       licenseExpiresAt: this.parseDate(body.licenseExpiresAt),
@@ -105,6 +110,8 @@ export class VehiclesService {
     if (body.year !== undefined) $set.year = body.year;
     if (body.color !== undefined) $set.color = body.color.trim();
     if (body.notes !== undefined) $set.notes = body.notes.trim();
+    if (body.odometerKm !== undefined) $set.odometerKm = body.odometerKm;
+    if (body.yearsOwned !== undefined) $set.yearsOwned = body.yearsOwned;
     if (body.soatExpiresAt !== undefined) {
       $set.soatExpiresAt = this.parseDate(body.soatExpiresAt);
     }
@@ -278,6 +285,8 @@ export class VehiclesService {
     year?: number;
     color?: string;
     notes?: string;
+    odometerKm?: number | null;
+    yearsOwned?: number | null;
     soatExpiresAt?: Date | null;
     technoExpiresAt?: Date | null;
     licenseExpiresAt?: Date | null;
@@ -286,6 +295,7 @@ export class VehiclesService {
       tecnomecanica?: VehicleDocumentFile;
       tarjetaPropiedad?: VehicleDocumentFile;
       licencia?: VehicleDocumentFile;
+      manual?: VehicleDocumentFile;
     };
     createdAt?: Date;
   }): VehicleDto {
@@ -298,6 +308,8 @@ export class VehiclesService {
       year: doc.year ?? null,
       color: doc.color ?? "",
       notes: doc.notes ?? "",
+      odometerKm: doc.odometerKm ?? null,
+      yearsOwned: doc.yearsOwned ?? null,
       soatExpiresAt: doc.soatExpiresAt
         ? new Date(doc.soatExpiresAt).toISOString()
         : null,
@@ -312,6 +324,7 @@ export class VehiclesService {
         tecnomecanica: this.toFileDto(doc.documents?.tecnomecanica),
         tarjetaPropiedad: this.toFileDto(doc.documents?.tarjetaPropiedad),
         licencia: this.toFileDto(doc.documents?.licencia),
+        manual: this.toFileDto(doc.documents?.manual),
       },
       createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : "",
     };

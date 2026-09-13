@@ -20,17 +20,22 @@ import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
 import { RequestWithUser } from "src/shared/infrastructure/types/request-with-user.type";
 import { IUploadedFile } from "src/shared/infrastructure/storage/uploaded-file.interface";
 import { VehiclesService } from "../../application/vehicles.service";
+import { VehicleAssistantUseCase } from "../../application/vehicle-assistant.useCase";
 import {
   VehicleCreateDto,
   VehicleUpdateDto,
 } from "../dtos/vehicle-write.dto";
+import { VehicleAssistantChatDto } from "../dtos/vehicle-assistant-chat.dto";
 
-const MAX_DOC_SIZE = 8 * 1024 * 1024;
+const MAX_DOC_SIZE = 12 * 1024 * 1024;
 
 @Controller("vehicles")
 @UseGuards(JwtAuthGuard)
 export class VehiclesController {
-  constructor(private readonly vehicles: VehiclesService) {}
+  constructor(
+    private readonly vehicles: VehiclesService,
+    private readonly assistant: VehicleAssistantUseCase
+  ) {}
 
   @Get()
   list(@Req() req: RequestWithUser) {
@@ -53,8 +58,35 @@ export class VehiclesController {
 
   @Delete(":id")
   async remove(@Req() req: RequestWithUser, @Param("id") id: string) {
+    await this.assistant.clear(req.user.id, id).catch(() => undefined);
     await this.vehicles.remove(req.user.id, id);
     return { ok: true };
+  }
+
+  @Get(":id/assistant/history")
+  assistantHistory(
+    @Req() req: RequestWithUser,
+    @Param("id") id: string
+  ) {
+    return this.assistant.history(req.user.id, id);
+  }
+
+  @Delete(":id/assistant/history")
+  async assistantClear(
+    @Req() req: RequestWithUser,
+    @Param("id") id: string
+  ) {
+    await this.assistant.clear(req.user.id, id);
+    return { ok: true };
+  }
+
+  @Post(":id/assistant/chat")
+  assistantChat(
+    @Req() req: RequestWithUser,
+    @Param("id") id: string,
+    @Body() body: VehicleAssistantChatDto
+  ) {
+    return this.assistant.chat(req.user.id, id, body);
   }
 
   @Get(":id/documents/:kind")
