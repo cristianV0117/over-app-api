@@ -39,6 +39,12 @@ const ALLOWED_EXT = new Set([
   ".png",
   ".webp",
   ".gif",
+  ".bmp",
+  ".avif",
+  ".heic",
+  ".heif",
+  ".tif",
+  ".tiff",
   ".txt",
   ".doc",
   ".docx",
@@ -51,9 +57,19 @@ const ALLOWED_EXT = new Set([
 const ALLOWED_MIME = new Set([
   "application/pdf",
   "image/jpeg",
+  "image/jpg",
+  "image/pjpeg",
   "image/png",
   "image/webp",
   "image/gif",
+  "image/bmp",
+  "image/x-ms-bmp",
+  "image/avif",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+  "image/tiff",
   "text/plain",
   "text/csv",
   "application/msword",
@@ -64,6 +80,21 @@ const ALLOWED_MIME = new Set([
   "application/x-zip-compressed",
   "application/octet-stream",
 ]);
+
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/pjpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "image/bmp": ".bmp",
+  "image/x-ms-bmp": ".bmp",
+  "image/avif": ".avif",
+  "image/heic": ".heic",
+  "image/heif": ".heif",
+  "image/tiff": ".tiff",
+};
 
 @Injectable()
 export class FilesService {
@@ -146,7 +177,7 @@ export class FilesService {
       this.uniqueFileName(file.originalname)
     );
     const id = new Types.ObjectId();
-    const ext = path.extname(file.originalname || "").toLowerCase() || ".bin";
+    const ext = this.fileExtension(file);
     const url = await this.storage.save(
       file,
       `files/${userId}`,
@@ -304,7 +335,15 @@ export class FilesService {
 
   private uniqueFileName(original: string): string {
     const base = path.basename(original || "archivo");
-    return this.normalizeName(base);
+    const name = this.normalizeName(base);
+    return name || "archivo";
+  }
+
+  private fileExtension(file: IUploadedFile): string {
+    const fromName = path.extname(file.originalname || "").toLowerCase();
+    if (ALLOWED_EXT.has(fromName)) return fromName;
+    const fromMime = MIME_TO_EXT[(file.mimetype || "").toLowerCase()];
+    return fromMime || ".bin";
   }
 
   private async nextAvailableName(
@@ -333,16 +372,13 @@ export class FilesService {
 
   private assertAllowedFile(file: IUploadedFile): void {
     const ext = path.extname(file.originalname || "").toLowerCase();
-    const mimeOk = ALLOWED_MIME.has(file.mimetype);
+    const mime = (file.mimetype || "").toLowerCase();
     const extOk = ALLOWED_EXT.has(ext);
-    if (!mimeOk && !extOk) {
-      throw new BadRequestException(
-        "Tipo de archivo no permitido. Usa PDF, imagen, Word, Excel, CSV, TXT o ZIP"
-      );
-    }
-    if (!extOk) {
-      throw new BadRequestException("Extensión de archivo no permitida");
-    }
+    const imageMimeOk = mime.startsWith("image/") && ALLOWED_MIME.has(mime);
+    if (extOk || imageMimeOk) return;
+    throw new BadRequestException(
+      "Tipo de archivo no permitido. Usa imagen (JPG, PNG, WEBP, GIF, HEIC), PDF, Word, Excel, CSV, TXT o ZIP"
+    );
   }
 
   private throwIfDuplicate(err: unknown): void {
