@@ -4,7 +4,9 @@ import {
   ConflictException,
   Controller,
   Post,
+  UseGuards,
 } from "@nestjs/common";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import {
   LoginResponseDTO,
   UserRegisterDTO,
@@ -20,10 +22,12 @@ import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
   description: "Cuenta creada; respuesta igual que en login",
 })
 @Controller("register")
+@UseGuards(ThrottlerGuard)
 export class UsersRegisterController {
   constructor(private readonly usersRegisterUseCase: UsersRegisterUseCase) {}
 
   @Post()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(@Body() body: UserRegisterDTO): Promise<LoginResponseDTO> {
     try {
       const user = await this.usersRegisterUseCase.register(body);

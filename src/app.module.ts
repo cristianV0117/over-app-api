@@ -12,12 +12,16 @@ import { CronModule } from "./cron/infrastructure/modules/cron.module";
 import { PayLinksModule } from "./pay-links/infrastructure/modules/pay-links.module";
 import { VehiclesModule } from "./vehicles/infrastructure/modules/vehicles.module";
 import { FilesModule } from "./files/infrastructure/modules/files.module";
+import { ThrottlerModule } from "@nestjs/throttler";
 
 @Module({
   imports: [
     //Se carga todas las variables de entorno
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60000, limit: 120 }],
     }),
     //Se inicia mongo
     MongooseModule.forRoot(process.env.MONGO_STRING ?? "", {

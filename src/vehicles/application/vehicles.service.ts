@@ -169,7 +169,11 @@ export class VehiclesService {
       /\\/g,
       "/"
     );
-    const url = await this.storage.save(file, folder, `${docKind}${path.extname(file.originalname) || ".pdf"}`);
+    const url = await this.storage.save(
+      file,
+      folder,
+      `${docKind}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${path.extname(file.originalname) || ".pdf"}`
+    );
 
     const next: VehicleDocumentFile = {
       url,
