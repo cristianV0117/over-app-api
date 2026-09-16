@@ -11,6 +11,7 @@ import { FinanceModule } from "./finance/infrastructure/modules/finance.module";
 import { CronModule } from "./cron/infrastructure/modules/cron.module";
 import { PayLinksModule } from "./pay-links/infrastructure/modules/pay-links.module";
 import { VehiclesModule } from "./vehicles/infrastructure/modules/vehicles.module";
+import { FilesModule } from "./files/infrastructure/modules/files.module";
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { VehiclesModule } from "./vehicles/infrastructure/modules/vehicles.modul
     CronModule,
     PayLinksModule,
     VehiclesModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
