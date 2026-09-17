@@ -15,6 +15,8 @@ export type DebtPayoffStep = {
   payment: number;
   interest: number;
   principal: number;
+  extraPrincipal: number;
+  paid: boolean;
   balance: number;
 };
 
@@ -120,6 +122,8 @@ export function simulateDebtPayoff(
       payment: Math.round(paid),
       interest: Math.round(interest),
       principal: Math.round(principal),
+      extraPrincipal: Math.round(extra),
+      paid: false,
       balance: Math.round(Math.max(0, balance)),
     });
   }
@@ -164,4 +168,82 @@ export function simulateDebtPlan(
     })
   );
   return { strategy, extraBudget: extra, items };
+}
+
+export type RecordedDebtPayment = {
+  year: number;
+  month: number;
+  amount: number;
+};
+
+export type AppliedDebtPayment = RecordedDebtPayment & {
+  date: string;
+  interest: number;
+  principal: number;
+  extraPrincipal: number;
+  balance: number;
+};
+
+export function yearMonthKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function applyDebtPaymentStep(
+  balance: number,
+  amount: number,
+  monthlyRate: number,
+  installmentAmount: number
+): {
+  interest: number;
+  principal: number;
+  extraPrincipal: number;
+  newBalance: number;
+} {
+  const interest = Math.max(0, balance) * monthlyRate;
+  let principal = amount - interest;
+  if (principal > balance) principal = balance;
+  const newBalance = Math.max(0, balance - principal);
+  const extraPrincipal = Math.max(0, amount - installmentAmount);
+  return { interest, principal, extraPrincipal, newBalance };
+}
+
+export function replayDebtPayments(
+  openingBalance: number,
+  installmentAmount: number,
+  interestRate: number,
+  interestRateType: FinanceInterestRateType,
+  payments: RecordedDebtPayment[]
+): { remaining: number; monthlyRate: number; applied: AppliedDebtPayment[] } {
+  const monthlyRate = monthlyRateFrom(interestRate, interestRateType);
+  const sorted = [...payments].sort(
+    (a, b) => a.year - b.year || a.month - b.month
+  );
+  let balance = Math.max(0, openingBalance);
+  const applied: AppliedDebtPayment[] = [];
+  for (const payment of sorted) {
+    const step = applyDebtPaymentStep(
+      balance,
+      payment.amount,
+      monthlyRate,
+      installmentAmount
+    );
+    balance = step.newBalance;
+    applied.push({
+      year: payment.year,
+      month: payment.month,
+      amount: payment.amount,
+      date: yearMonthKey(payment.year, payment.month),
+      interest: Math.round(step.interest),
+      principal: Math.round(step.principal),
+      extraPrincipal: Math.round(step.extraPrincipal),
+      balance: Math.round(Math.max(0, balance)),
+    });
+  }
+  return { remaining: Math.max(0, balance), monthlyRate, applied };
+}
+
+export function lastPaymentDateUtc(payments: AppliedDebtPayment[]): Date | null {
+  if (!payments.length) return null;
+  const last = payments[payments.length - 1];
+  return new Date(Date.UTC(last.year, last.month - 1, 1));
 }

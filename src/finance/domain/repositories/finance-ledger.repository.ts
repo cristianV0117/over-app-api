@@ -18,9 +18,22 @@ export type FinanceDebtWrite = {
   dayOfMonth: number;
   totalInstallments?: number | null;
   paidInstallments?: number;
+  paymentBaseBalance?: number | null;
   startDate?: Date | null;
   notes?: string;
   isActive?: boolean;
+};
+
+export type FinanceDebtPaymentRecord = {
+  id: string;
+  userId: string;
+  debtId: string;
+  year: number;
+  month: number;
+  amount: number;
+  interestPortion: number;
+  principalPortion: number;
+  extraPrincipal: number;
 };
 
 export type FinanceCategoryDeleteResult =
@@ -192,6 +205,7 @@ export interface FinanceLedgerRepository {
   ): Promise<void>;
 
   findDebtsByUser(userId: string): Promise<FinanceDebt[]>;
+  findDebtById(userId: string, id: string): Promise<FinanceDebt | null>;
   createDebt(userId: string, data: FinanceDebtWrite): Promise<FinanceDebt>;
   updateDebt(
     userId: string,
@@ -199,4 +213,34 @@ export interface FinanceLedgerRepository {
     patch: Partial<FinanceDebtWrite>
   ): Promise<FinanceDebt | null>;
   deleteDebt(userId: string, id: string): Promise<boolean>;
+
+  findDebtPayments(
+    userId: string,
+    debtId?: string
+  ): Promise<FinanceDebtPaymentRecord[]>;
+  upsertDebtPayment(
+    userId: string,
+    debtId: string,
+    year: number,
+    month: number,
+    amount: number
+  ): Promise<void>;
+  updateDebtPaymentBreakdown(
+    userId: string,
+    debtId: string,
+    year: number,
+    month: number,
+    breakdown: {
+      interestPortion: number;
+      principalPortion: number;
+      extraPrincipal: number;
+    }
+  ): Promise<void>;
+  deleteDebtPayment(
+    userId: string,
+    debtId: string,
+    year: number,
+    month: number
+  ): Promise<boolean>;
+  deleteDebtPaymentsByDebt(userId: string, debtId: string): Promise<void>;
 }

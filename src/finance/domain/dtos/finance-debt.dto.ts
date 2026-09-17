@@ -6,6 +6,7 @@ export type FinanceDebtProps = {
   name: string;
   creditor: string;
   balance: number;
+  paymentBaseBalance: number | null;
   principal: number;
   interestRate: number;
   interestRateType: FinanceInterestRateType;

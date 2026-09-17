@@ -1,6 +1,8 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { FinanceLedgerRepository } from "src/finance/domain/repositories/finance-ledger.repository";
 import {
+  lastPaymentDateUtc,
+  replayDebtPayments,
   simulateDebtPayoff,
   type DebtPayoffInput,
   type DebtPayoffResult,
@@ -45,27 +47,73 @@ export class FinanceDebtsForecastUseCase {
     }
 
     const extra = Math.max(0, extraMonthly);
+    const allPayments = await this.ledger.findDebtPayments(userId);
+    const paymentsByDebt = new Map<string, typeof allPayments>();
+    for (const payment of allPayments) {
+      const list = paymentsByDebt.get(payment.debtId) ?? [];
+      list.push(payment);
+      paymentsByDebt.set(payment.debtId, list);
+    }
+
     const items = selected.map((row, index) => {
       const j = row.toJSON();
+      const recorded = paymentsByDebt.get(j.id) ?? [];
+      const opening =
+        j.paymentBaseBalance != null ? j.paymentBaseBalance : j.balance;
+      const replayed = replayDebtPayments(
+        opening,
+        j.installmentAmount,
+        j.interestRate,
+        j.interestRateType,
+        recorded.map((p) => ({
+          year: p.year,
+          month: p.month,
+          amount: p.amount,
+        }))
+      );
+      const remaining = recorded.length ? replayed.remaining : j.balance;
+      const from = lastPaymentDateUtc(replayed.applied) ?? new Date();
       const input: DebtPayoffInput = {
         name: j.name,
-        balance: j.balance,
+        balance: remaining,
         interestRate: j.interestRate,
         interestRateType: j.interestRateType,
         installmentAmount: j.installmentAmount,
         extraMonthly: selected.length === 1 ? extra : index === 0 ? extra : 0,
       };
-      const sim = simulateDebtPayoff(input);
+      const sim = simulateDebtPayoff(input, from);
+      const paidSchedule = replayed.applied.map((step, i) => ({
+        month: i + 1,
+        date: step.date,
+        payment: Math.round(step.amount),
+        interest: step.interest,
+        principal: step.principal,
+        extraPrincipal: step.extraPrincipal,
+        paid: true,
+        balance: step.balance,
+      }));
+      const remainingSchedule = sim.schedule.map((step) => ({
+        ...step,
+        month: paidSchedule.length + step.month,
+        paid: false,
+      }));
+      const paidOff = remaining <= 0.5;
       return {
         ...sim,
+        neverPays: paidOff ? false : sim.neverPays,
+        payoffDate: paidOff
+          ? paidSchedule[paidSchedule.length - 1]?.date ?? sim.payoffDate
+          : sim.payoffDate,
+        months: sim.months,
+        schedule: [...paidSchedule, ...remainingSchedule],
         id: j.id,
         creditor: j.creditor,
-        balance: j.balance,
+        balance: Math.round(remaining),
         installmentAmount: j.installmentAmount,
         interestRate: j.interestRate,
         interestRateType: j.interestRateType,
         dayOfMonth: j.dayOfMonth,
-        paidInstallments: j.paidInstallments,
+        paidInstallments: recorded.length,
         totalInstallments: j.totalInstallments,
       };
     });

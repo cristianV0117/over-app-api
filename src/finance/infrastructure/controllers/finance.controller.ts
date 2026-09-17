@@ -68,8 +68,12 @@ import { FinanceExportUseCase } from "src/finance/application/finance-export.use
 import { FinanceAssistantUseCase } from "src/finance/application/finance-assistant.useCase";
 import { FinanceRangeOverviewUseCase } from "src/finance/application/finance-range-overview.useCase";
 import { FinanceDebtsForecastUseCase } from "src/finance/application/finance-debts-forecast.useCase";
+import { FinanceDebtPaymentsUpsertUseCase } from "src/finance/application/finance-debt-payments-upsert.useCase";
+import { FinanceDebtPaymentsDeleteUseCase } from "src/finance/application/finance-debt-payments-delete.useCase";
 import { FinanceOverviewQueryDto } from "../dtos/finance-overview-query.dto";
 import { FinanceDebtForecastQueryDto } from "../dtos/finance-debt-forecast-query.dto";
+import { FinanceDebtPaymentUpsertDto } from "../dtos/finance-debt-payment-upsert.dto";
+import { FinanceDebtPaymentQueryDto } from "../dtos/finance-debt-payment-query.dto";
 
 @Controller("finance")
 export class FinanceController {
@@ -107,7 +111,9 @@ export class FinanceController {
     private readonly financeExport: FinanceExportUseCase,
     private readonly assistant: FinanceAssistantUseCase,
     private readonly rangeOverview: FinanceRangeOverviewUseCase,
-    private readonly debtsForecast: FinanceDebtsForecastUseCase
+    private readonly debtsForecast: FinanceDebtsForecastUseCase,
+    private readonly debtPaymentsUpsert: FinanceDebtPaymentsUpsertUseCase,
+    private readonly debtPaymentsDelete: FinanceDebtPaymentsDeleteUseCase
   ) {}
 
   @Put("liquidity")
@@ -438,6 +444,37 @@ export class FinanceController {
   ) {
     const d = await this.debtsStore.execute(body, req.user.id);
     return d.toJSON();
+  }
+
+  @Put("debts/:id/payments")
+  @UseGuards(JwtAuthGuard)
+  async debtPaymentPut(
+    @Param("id") id: string,
+    @Body() body: FinanceDebtPaymentUpsertDto,
+    @Req() req: RequestWithUser
+  ) {
+    return this.debtPaymentsUpsert.execute(
+      req.user.id,
+      id,
+      body.year,
+      body.month,
+      body.amount
+    );
+  }
+
+  @Delete("debts/:id/payments")
+  @UseGuards(JwtAuthGuard)
+  async debtPaymentRemove(
+    @Param("id") id: string,
+    @Query() query: FinanceDebtPaymentQueryDto,
+    @Req() req: RequestWithUser
+  ) {
+    return this.debtPaymentsDelete.execute(
+      req.user.id,
+      id,
+      query.year,
+      query.month
+    );
   }
 
   @Patch("debts/:id")

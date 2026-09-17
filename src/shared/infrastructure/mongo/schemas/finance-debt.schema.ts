@@ -12,8 +12,12 @@ export class FinanceDebtModel {
   @Prop({ default: "" })
   creditor!: string;
 
-  @Prop({ required: true, min: 0 })
+  @Prop({ type: Number, required: true, min: 0 })
   balance!: number;
+
+  /** Saldo al registrar el primer pago; el restante se recalcula desde acá. */
+  @Prop({ type: Number, default: null })
+  paymentBaseBalance!: number | null;
 
   @Prop({ default: 0, min: 0 })
   principal!: number;

@@ -52,8 +52,15 @@ import {
   FinanceDebtDocument,
   FinanceDebtModel,
 } from "src/shared/infrastructure/mongo/schemas/finance-debt.schema";
+import {
+  FinanceDebtPaymentDocument,
+  FinanceDebtPaymentModel,
+} from "src/shared/infrastructure/mongo/schemas/finance-debt-payment.schema";
 import { FinanceDebt } from "src/finance/domain/finance-debt";
-import type { FinanceDebtWrite } from "src/finance/domain/repositories/finance-ledger.repository";
+import type {
+  FinanceDebtPaymentRecord,
+  FinanceDebtWrite,
+} from "src/finance/domain/repositories/finance-ledger.repository";
 
 function monthRangeUtc(year: number, month: number) {
   const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
@@ -85,7 +92,9 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     @InjectModel(FinanceRecurringIncomeReceivedModel.name)
     private readonly recurringIncomeReceivedModel: Model<FinanceRecurringIncomeReceivedDocument>,
     @InjectModel(FinanceDebtModel.name)
-    private readonly debtModel: Model<FinanceDebtDocument>
+    private readonly debtModel: Model<FinanceDebtDocument>,
+    @InjectModel(FinanceDebtPaymentModel.name)
+    private readonly debtPaymentModel: Model<FinanceDebtPaymentDocument>
   ) {}
 
   async findIncomeCategoriesByUser(userId: string): Promise<IncomeCategory[]> {
@@ -1098,6 +1107,19 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     );
   }
 
+  async findDebtById(userId: string, id: string): Promise<FinanceDebt | null> {
+    if (!Types.ObjectId.isValid(id)) return null;
+    const doc = await this.debtModel
+      .findOne({
+        _id: new Types.ObjectId(id),
+        userId: new Types.ObjectId(userId),
+      })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return this.mapDebtEntity(doc as unknown as Record<string, unknown>);
+  }
+
   async createDebt(
     userId: string,
     data: FinanceDebtWrite
@@ -1114,6 +1136,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       dayOfMonth: Math.min(31, Math.max(1, Math.floor(data.dayOfMonth))),
       totalInstallments: data.totalInstallments ?? null,
       paidInstallments: data.paidInstallments ?? 0,
+      paymentBaseBalance: null,
       startDate: data.startDate ?? null,
       notes: data.notes?.trim() ?? "",
       isActive: data.isActive ?? true,
@@ -1147,6 +1170,8 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
     if (patch.startDate !== undefined) $set.startDate = patch.startDate;
     if (patch.notes !== undefined) $set.notes = patch.notes.trim();
     if (patch.isActive !== undefined) $set.isActive = patch.isActive;
+    if (patch.paymentBaseBalance !== undefined)
+      $set.paymentBaseBalance = patch.paymentBaseBalance;
     const updated = await this.debtModel
       .findOneAndUpdate(
         { _id: new Types.ObjectId(id), userId: new Types.ObjectId(userId) },
@@ -1160,11 +1185,125 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
   }
 
   async deleteDebt(userId: string, id: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(id)) return false;
     const res = await this.debtModel.findOneAndDelete({
       _id: new Types.ObjectId(id),
       userId: new Types.ObjectId(userId),
     });
+    if (res) {
+      await this.debtPaymentModel.deleteMany({
+        userId: new Types.ObjectId(userId),
+        debtId: new Types.ObjectId(id),
+      });
+    }
     return !!res;
+  }
+
+  async findDebtPayments(
+    userId: string,
+    debtId?: string
+  ): Promise<FinanceDebtPaymentRecord[]> {
+    const filter: Record<string, unknown> = {
+      userId: new Types.ObjectId(userId),
+    };
+    if (debtId) {
+      if (!Types.ObjectId.isValid(debtId)) return [];
+      filter.debtId = new Types.ObjectId(debtId);
+    }
+    const docs = await this.debtPaymentModel
+      .find(filter)
+      .sort({ year: 1, month: 1 })
+      .lean()
+      .exec();
+    return docs.map((d) => this.mapDebtPayment(d as unknown as Record<string, unknown>));
+  }
+
+  async upsertDebtPayment(
+    userId: string,
+    debtId: string,
+    year: number,
+    month: number,
+    amount: number
+  ): Promise<void> {
+    await this.debtPaymentModel.updateOne(
+      {
+        userId: new Types.ObjectId(userId),
+        debtId: new Types.ObjectId(debtId),
+        year,
+        month,
+      },
+      {
+        $set: { amount },
+        $setOnInsert: {
+          interestPortion: 0,
+          principalPortion: 0,
+          extraPrincipal: 0,
+        },
+      },
+      { upsert: true }
+    );
+  }
+
+  async updateDebtPaymentBreakdown(
+    userId: string,
+    debtId: string,
+    year: number,
+    month: number,
+    breakdown: {
+      interestPortion: number;
+      principalPortion: number;
+      extraPrincipal: number;
+    }
+  ): Promise<void> {
+    await this.debtPaymentModel.updateOne(
+      {
+        userId: new Types.ObjectId(userId),
+        debtId: new Types.ObjectId(debtId),
+        year,
+        month,
+      },
+      { $set: breakdown }
+    );
+  }
+
+  async deleteDebtPayment(
+    userId: string,
+    debtId: string,
+    year: number,
+    month: number
+  ): Promise<boolean> {
+    const res = await this.debtPaymentModel.findOneAndDelete({
+      userId: new Types.ObjectId(userId),
+      debtId: new Types.ObjectId(debtId),
+      year,
+      month,
+    });
+    return !!res;
+  }
+
+  async deleteDebtPaymentsByDebt(userId: string, debtId: string): Promise<void> {
+    if (!Types.ObjectId.isValid(debtId)) return;
+    await this.debtPaymentModel.deleteMany({
+      userId: new Types.ObjectId(userId),
+      debtId: new Types.ObjectId(debtId),
+    });
+  }
+
+  private mapDebtPayment(d: Record<string, unknown>): FinanceDebtPaymentRecord {
+    const _id = d._id as Types.ObjectId;
+    const userId = d.userId as Types.ObjectId;
+    const debtId = d.debtId as Types.ObjectId;
+    return {
+      id: _id.toString(),
+      userId: userId.toString(),
+      debtId: debtId.toString(),
+      year: d.year as number,
+      month: d.month as number,
+      amount: d.amount as number,
+      interestPortion: (d.interestPortion as number) ?? 0,
+      principalPortion: (d.principalPortion as number) ?? 0,
+      extraPrincipal: (d.extraPrincipal as number) ?? 0,
+    };
   }
 
   private mapDebtEntity(d: Record<string, unknown>): FinanceDebt {
@@ -1176,6 +1315,7 @@ export class FinanceLedgerImplementation implements FinanceLedgerRepository {
       name: (d.name as string) ?? "",
       creditor: (d.creditor as string) ?? "",
       balance: d.balance as number,
+      paymentBaseBalance: (d.paymentBaseBalance as number | null) ?? null,
       principal: (d.principal as number) ?? 0,
       interestRate: d.interestRate as number,
       interestRateType: (d.interestRateType as "NM" | "EA") ?? "NM",

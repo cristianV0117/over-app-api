@@ -42,6 +42,10 @@ import {
   FinanceDebtSchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-debt.schema";
 import {
+  FinanceDebtPaymentModel,
+  FinanceDebtPaymentSchema,
+} from "src/shared/infrastructure/mongo/schemas/finance-debt-payment.schema";
+import {
   FinanceAssistantThreadModel,
   FinanceAssistantThreadSchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-assistant-thread.schema";
@@ -83,6 +87,9 @@ import { FinanceExportUseCase } from "src/finance/application/finance-export.use
 import { FinanceAssistantUseCase } from "src/finance/application/finance-assistant.useCase";
 import { FinanceRangeOverviewUseCase } from "src/finance/application/finance-range-overview.useCase";
 import { FinanceDebtsForecastUseCase } from "src/finance/application/finance-debts-forecast.useCase";
+import { FinanceDebtPaymentsReplayService } from "src/finance/application/finance-debt-payments-replay.service";
+import { FinanceDebtPaymentsUpsertUseCase } from "src/finance/application/finance-debt-payments-upsert.useCase";
+import { FinanceDebtPaymentsDeleteUseCase } from "src/finance/application/finance-debt-payments-delete.useCase";
 
 @Module({
   imports: [
@@ -118,6 +125,10 @@ import { FinanceDebtsForecastUseCase } from "src/finance/application/finance-deb
         schema: FinanceLiquiditySchema,
       },
       { name: FinanceDebtModel.name, schema: FinanceDebtSchema },
+      {
+        name: FinanceDebtPaymentModel.name,
+        schema: FinanceDebtPaymentSchema,
+      },
       {
         name: FinanceAssistantThreadModel.name,
         schema: FinanceAssistantThreadSchema,
@@ -170,6 +181,9 @@ import { FinanceDebtsForecastUseCase } from "src/finance/application/finance-deb
     FinanceAssistantUseCase,
     FinanceRangeOverviewUseCase,
     FinanceDebtsForecastUseCase,
+    FinanceDebtPaymentsReplayService,
+    FinanceDebtPaymentsUpsertUseCase,
+    FinanceDebtPaymentsDeleteUseCase,
   ],
 })
 export class FinanceModule {}

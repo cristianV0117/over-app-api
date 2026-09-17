@@ -10,6 +10,7 @@ export class FinanceDebt {
       name: this.props.name,
       creditor: this.props.creditor,
       balance: this.props.balance,
+      paymentBaseBalance: this.props.paymentBaseBalance,
       principal: this.props.principal,
       interestRate: this.props.interestRate,
       interestRateType: this.props.interestRateType,
