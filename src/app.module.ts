@@ -12,6 +12,7 @@ import { CronModule } from "./cron/infrastructure/modules/cron.module";
 import { PayLinksModule } from "./pay-links/infrastructure/modules/pay-links.module";
 import { VehiclesModule } from "./vehicles/infrastructure/modules/vehicles.module";
 import { FilesModule } from "./files/infrastructure/modules/files.module";
+import { PortfolioModule } from "./portfolio/infrastructure/modules/portfolio.module";
 import { ThrottlerModule } from "@nestjs/throttler";
 
 @Module({
@@ -49,6 +50,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
     PayLinksModule,
     VehiclesModule,
     FilesModule,
+    PortfolioModule,
   ],
   controllers: [AppController],
   providers: [AppService],
