@@ -13,6 +13,7 @@ import { PayLinksModule } from "./pay-links/infrastructure/modules/pay-links.mod
 import { VehiclesModule } from "./vehicles/infrastructure/modules/vehicles.module";
 import { FilesModule } from "./files/infrastructure/modules/files.module";
 import { PortfolioModule } from "./portfolio/infrastructure/modules/portfolio.module";
+import { CvModule } from "./cv/infrastructure/modules/cv.module";
 import { ThrottlerModule } from "@nestjs/throttler";
 
 @Module({
@@ -51,6 +52,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
     VehiclesModule,
     FilesModule,
     PortfolioModule,
+    CvModule,
   ],
   controllers: [AppController],
   providers: [AppService],
