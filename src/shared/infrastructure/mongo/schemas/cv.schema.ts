@@ -47,6 +47,9 @@ export class CvThemeModel {
 
   @Prop({ default: "calibri" })
   fontFamily!: string;
+
+  @Prop({ default: false })
+  repeatSidebar!: boolean;
 }
 
 @Schema({ _id: false })

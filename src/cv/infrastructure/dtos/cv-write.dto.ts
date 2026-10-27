@@ -63,6 +63,10 @@ export class CvThemeDto {
   @IsString()
   @MaxLength(32)
   fontFamily?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  repeatSidebar?: boolean;
 }
 
 export class CvHeaderDto {

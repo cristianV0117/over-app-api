@@ -29,6 +29,7 @@ export type CvThemeDto = {
   chipBg: string;
   chipText: string;
   fontFamily: string;
+  repeatSidebar: boolean;
 };
 
 export type CvHeaderDto = {
@@ -143,9 +144,10 @@ export class CvService {
 
     const source = await this.findOwned(userId, cvId);
     const sourceHeader = this.headerToPlain(source.header);
+    const sourceSections = this.normalizeSections(source.sections);
     const payload = {
       header: { ...sourceHeader, photoDataUrl: "" },
-      sections: this.normalizeSections(source.sections),
+      sections: stripHeavyImages(sourceSections),
     };
 
     const translated = await this.callTranslate(payload, apiKey);
@@ -162,7 +164,10 @@ export class CvService {
         photoDataUrl: sourceHeader.photoDataUrl,
         showPhoto: sourceHeader.showPhoto,
       },
-      sections: this.normalizeSections(translated.sections),
+      sections: restoreProjectImages(
+        this.normalizeSections(translated.sections),
+        sourceSections
+      ),
     });
     return this.toDto(doc);
   }
@@ -210,7 +215,7 @@ export class CvService {
           {
             role: "system",
             content:
-              "You translate CVs from Spanish to English. Return ONLY valid JSON with the same schema: { header, sections }. Translate titles, labels, descriptions, taglines and section titles. Keep company names, URLs, embedUrl, emails, phones, startMonth, endMonth, current, photoDataUrl, showPhoto, institution names, course providers, and tech tags (NestJS, MongoDB, PHP, etc.). If a section type is icons, keep config.items as the same icon ids. Do not invent experience or projects.",
+              "You translate CVs from Spanish to English. Return ONLY valid JSON with the same schema: { header, sections }. Translate titles, labels, descriptions, taglines and section titles. Keep company names, URLs, emails, phones, startMonth, endMonth, current, imageDataUrl, photoDataUrl, showPhoto, institution names, course providers, and tech tags (NestJS, MongoDB, PHP, etc.). If a section type is icons, keep config.items as the same icon ids. Do not invent experience or projects.",
           },
           { role: "user", content: JSON.stringify(payload) },
         ],
@@ -272,6 +277,7 @@ export class CvService {
             chipBg: theme.chipBg,
             chipText: theme.chipText,
             fontFamily: theme.fontFamily || DEFAULT_CV_THEME.fontFamily,
+            repeatSidebar: Boolean(theme.repeatSidebar),
           }
         : {}),
     };
@@ -317,4 +323,50 @@ export class CvService {
         : null,
     };
   }
+}
+
+function projectItems(
+  config: Record<string, unknown> | undefined
+): Array<Record<string, unknown>> {
+  const items = config?.items;
+  return Array.isArray(items) ? (items as Array<Record<string, unknown>>) : [];
+}
+
+function stripHeavyImages(sections: CvSectionModel[]): CvSectionModel[] {
+  return sections.map((section) => {
+    if (section.type !== "projects") return section;
+    return {
+      ...section,
+      config: {
+        ...section.config,
+        items: projectItems(section.config).map((item) => ({
+          ...item,
+          imageDataUrl: "",
+        })),
+      },
+    };
+  });
+}
+
+function restoreProjectImages(
+  translated: CvSectionModel[],
+  source: CvSectionModel[]
+): CvSectionModel[] {
+  return translated.map((section) => {
+    if (section.type !== "projects") return section;
+    const original = source.find((s) => s.id === section.id);
+    const originals = projectItems(original?.config);
+    return {
+      ...section,
+      config: {
+        ...section.config,
+        items: projectItems(section.config).map((item, i) => ({
+          ...item,
+          imageDataUrl: String(
+            originals[i]?.imageDataUrl ?? item.imageDataUrl ?? ""
+          ),
+        })),
+      },
+    };
+  });
 }

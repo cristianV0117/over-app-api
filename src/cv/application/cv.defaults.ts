@@ -15,6 +15,7 @@ export const DEFAULT_CV_THEME: CvThemeModel = {
   chipBg: "#6B2A44",
   chipText: "#FFFFFF",
   fontFamily: "calibri",
+  repeatSidebar: false,
 };
 
 export function defaultCvHeader(name: string, email: string): CvHeaderModel {
@@ -195,7 +196,7 @@ export function defaultCvSections(): CvSectionModel[] {
             description:
               "Aplicación propia para organizar el día a día. API hexagonal en NestJS y frontend Next.js.",
             url: "https://over-api-application-production.up.railway.app/",
-            embedUrl: "https://over-api-application-production.up.railway.app/",
+            imageDataUrl: "",
             tags: ["NestJS", "Next.js", "MongoDB"],
           },
         ],
