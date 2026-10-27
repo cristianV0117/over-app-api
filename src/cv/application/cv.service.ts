@@ -210,7 +210,7 @@ export class CvService {
           {
             role: "system",
             content:
-              "You translate CVs from Spanish to English. Return ONLY valid JSON with the same schema: { header, sections }. Translate titles, labels, descriptions and section titles. Keep company names, URLs, emails, phones, dates, photoDataUrl, showPhoto, and tech names (NestJS, MongoDB, PHP, etc.). If a section type is icons, keep config.items as the same icon ids. Do not invent experience.",
+              "You translate CVs from Spanish to English. Return ONLY valid JSON with the same schema: { header, sections }. Translate titles, labels, descriptions, taglines and section titles. Keep company names, URLs, embedUrl, emails, phones, startMonth, endMonth, current, photoDataUrl, showPhoto, institution names, course providers, and tech tags (NestJS, MongoDB, PHP, etc.). If a section type is icons, keep config.items as the same icon ids. Do not invent experience or projects.",
           },
           { role: "user", content: JSON.stringify(payload) },
         ],

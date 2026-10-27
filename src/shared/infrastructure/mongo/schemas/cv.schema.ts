@@ -10,6 +10,7 @@ export type CvSectionType =
   | "languages"
   | "courses"
   | "experience"
+  | "projects"
   | "icons"
   | "custom";
 

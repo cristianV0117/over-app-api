@@ -78,6 +78,7 @@ export function defaultCvSections(): CvSectionModel[] {
         items: [
           {
             title: "Ingeniería en sistemas",
+            institution: "Universidad San José",
             place: "Bogotá",
             year: "2025",
             detail: "Ingeniero de Sistemas.",
@@ -146,12 +147,12 @@ export function defaultCvSections(): CvSectionModel[] {
       title: "Cursos",
       config: {
         items: [
-          { title: "Curso avanzado de PHP", date: "Jul. 2021" },
-          { title: "Curso de API REST con PHP", date: "Jul. 2021" },
-          { title: "Curso profesional de Scrum", date: "Ago. 2021" },
-          { title: "Principios SOLID aplicados", date: "Oct. 2021" },
-          { title: "Arquitectura hexagonal", date: "Feb. 2023" },
-          { title: "Curso avanzado de Laravel", date: "Jun. 2023" },
+          { title: "Curso avanzado de PHP", provider: "Udemy", date: "Jul. 2021" },
+          { title: "Curso de API REST con PHP", provider: "Udemy", date: "Jul. 2021" },
+          { title: "Curso profesional de Scrum", provider: "Udemy", date: "Ago. 2021" },
+          { title: "Principios SOLID aplicados", provider: "CodelyTV", date: "Oct. 2021" },
+          { title: "Arquitectura hexagonal", provider: "CodelyTV", date: "Feb. 2023" },
+          { title: "Curso avanzado de Laravel", provider: "Udemy", date: "Jun. 2023" },
         ],
       },
     },
@@ -168,11 +169,34 @@ export function defaultCvSections(): CvSectionModel[] {
             company: "Empresa",
             role: "Desarrollador BackEnd",
             location: "Bogotá",
-            start: "nov. 2024",
-            end: "ene. 2026",
-            duration: "1 año 3 meses",
+            startMonth: "2024-11",
+            endMonth: "2026-01",
+            current: false,
             description:
               "Mantenimiento e implementación de funcionalidades, modernización de arquitectura (DDD, hexagonal) y flujos de datos.",
+            tags: ["PHP", "Laravel", "MySQL"],
+          },
+        ],
+      },
+    },
+    {
+      id: "projects-1",
+      type: "projects",
+      column: "main",
+      order: 1,
+      visible: true,
+      title: "Proyectos",
+      config: {
+        items: [
+          {
+            name: "OVER APP",
+            role: "Autor · Full stack",
+            tagline: "OS personal: finanzas, tareas, vehículo, archivos y asistente",
+            description:
+              "Aplicación propia para organizar el día a día. API hexagonal en NestJS y frontend Next.js.",
+            url: "https://over-api-application-production.up.railway.app/",
+            embedUrl: "https://over-api-application-production.up.railway.app/",
+            tags: ["NestJS", "Next.js", "MongoDB"],
           },
         ],
       },
