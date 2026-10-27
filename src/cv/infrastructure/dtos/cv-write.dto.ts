@@ -58,6 +58,11 @@ export class CvThemeDto {
   @IsString()
   @MaxLength(32)
   chipText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  fontFamily?: string;
 }
 
 export class CvHeaderDto {
@@ -85,6 +90,15 @@ export class CvHeaderDto {
   @IsString()
   @MaxLength(120)
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(900000)
+  photoDataUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  showPhoto?: boolean;
 }
 
 export class CvSectionDto {

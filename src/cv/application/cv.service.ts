@@ -28,6 +28,7 @@ export type CvThemeDto = {
   body: string;
   chipBg: string;
   chipText: string;
+  fontFamily: string;
 };
 
 export type CvHeaderDto = {
@@ -36,6 +37,8 @@ export type CvHeaderDto = {
   location: string;
   phone: string;
   email: string;
+  photoDataUrl: string;
+  showPhoto: boolean;
 };
 
 export type CvSectionDto = {
@@ -139,8 +142,9 @@ export class CvService {
     }
 
     const source = await this.findOwned(userId, cvId);
+    const sourceHeader = this.headerToPlain(source.header);
     const payload = {
-      header: this.headerToPlain(source.header),
+      header: { ...sourceHeader, photoDataUrl: "" },
       sections: this.normalizeSections(source.sections),
     };
 
@@ -153,7 +157,11 @@ export class CvService {
       locale: "en",
       translatedFromId: source._id,
       theme: this.themeToPlain(source.theme),
-      header: translated.header,
+      header: {
+        ...translated.header,
+        photoDataUrl: sourceHeader.photoDataUrl,
+        showPhoto: sourceHeader.showPhoto,
+      },
       sections: this.normalizeSections(translated.sections),
     });
     return this.toDto(doc);
@@ -202,7 +210,7 @@ export class CvService {
           {
             role: "system",
             content:
-              "You translate CVs from Spanish to English. Return ONLY valid JSON with the same schema: { header, sections }. Translate titles, labels, descriptions and section titles. Keep company names, URLs, emails, phones, dates, and tech names (NestJS, MongoDB, PHP, etc.). Do not invent experience.",
+              "You translate CVs from Spanish to English. Return ONLY valid JSON with the same schema: { header, sections }. Translate titles, labels, descriptions and section titles. Keep company names, URLs, emails, phones, dates, photoDataUrl, showPhoto, and tech names (NestJS, MongoDB, PHP, etc.). If a section type is icons, keep config.items as the same icon ids. Do not invent experience.",
           },
           { role: "user", content: JSON.stringify(payload) },
         ],
@@ -263,6 +271,7 @@ export class CvService {
             body: theme.body,
             chipBg: theme.chipBg,
             chipText: theme.chipText,
+            fontFamily: theme.fontFamily || DEFAULT_CV_THEME.fontFamily,
           }
         : {}),
     };
@@ -275,6 +284,8 @@ export class CvService {
       location: header?.location ?? "",
       phone: header?.phone ?? "",
       email: header?.email ?? "",
+      photoDataUrl: header?.photoDataUrl ?? "",
+      showPhoto: Boolean(header?.showPhoto),
     };
   }
 

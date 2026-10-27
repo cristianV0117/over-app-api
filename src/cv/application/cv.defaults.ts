@@ -14,6 +14,7 @@ export const DEFAULT_CV_THEME: CvThemeModel = {
   body: "#2C2426",
   chipBg: "#6B2A44",
   chipText: "#FFFFFF",
+  fontFamily: "calibri",
 };
 
 export function defaultCvHeader(name: string, email: string): CvHeaderModel {
@@ -23,6 +24,8 @@ export function defaultCvHeader(name: string, email: string): CvHeaderModel {
     location: "Bogotá, Colombia",
     phone: "",
     email: email || "",
+    photoDataUrl: "",
+    showPhoto: false,
   };
 }
 
@@ -110,10 +113,21 @@ export function defaultCvSections(): CvSectionModel[] {
       },
     },
     {
+      id: "icons-1",
+      type: "icons",
+      column: "sidebar",
+      order: 5,
+      visible: true,
+      title: "Stack",
+      config: {
+        items: ["php", "js", "ts", "mysql", "node", "nestjs", "laravel", "git"],
+      },
+    },
+    {
       id: "languages-1",
       type: "languages",
       column: "sidebar",
-      order: 5,
+      order: 6,
       visible: true,
       title: "Idiomas",
       config: {
@@ -127,7 +141,7 @@ export function defaultCvSections(): CvSectionModel[] {
       id: "courses-1",
       type: "courses",
       column: "sidebar",
-      order: 6,
+      order: 7,
       visible: true,
       title: "Cursos",
       config: {

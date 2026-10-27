@@ -10,6 +10,7 @@ export type CvSectionType =
   | "languages"
   | "courses"
   | "experience"
+  | "icons"
   | "custom";
 
 export type CvColumn = "sidebar" | "main";
@@ -42,6 +43,9 @@ export class CvThemeModel {
 
   @Prop({ default: "#FFFFFF" })
   chipText!: string;
+
+  @Prop({ default: "calibri" })
+  fontFamily!: string;
 }
 
 @Schema({ _id: false })
@@ -60,6 +64,12 @@ export class CvHeaderModel {
 
   @Prop({ default: "" })
   email!: string;
+
+  @Prop({ default: "" })
+  photoDataUrl!: string;
+
+  @Prop({ default: false })
+  showPhoto!: boolean;
 }
 
 @Schema({ _id: false })
