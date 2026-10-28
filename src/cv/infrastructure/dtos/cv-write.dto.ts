@@ -142,6 +142,13 @@ export class CvSectionDto {
   title?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(70)
+  @Max(140)
+  scale?: number;
+
+  @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
 }

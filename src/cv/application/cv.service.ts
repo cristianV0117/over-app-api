@@ -50,6 +50,7 @@ export type CvSectionDto = {
   order: number;
   visible: boolean;
   title: string;
+  scale: number;
   config: Record<string, unknown>;
 };
 
@@ -166,7 +167,13 @@ export class CvService {
         showPhoto: sourceHeader.showPhoto,
       },
       sections: restoreProjectImages(
-        this.normalizeSections(translated.sections),
+        this.normalizeSections(translated.sections).map((section) => {
+          const original = sourceSections.find((s) => s.id === section.id);
+          return {
+            ...section,
+            scale: original?.scale ?? section.scale ?? 100,
+          };
+        }),
         sourceSections
       ),
     });
@@ -181,6 +188,7 @@ export class CvService {
       order?: number;
       visible?: boolean;
       title?: string;
+      scale?: number;
       config?: Record<string, unknown>;
     }>
   ): CvSectionModel[] {
@@ -191,6 +199,7 @@ export class CvService {
       order: s.order ?? index,
       visible: s.visible !== false,
       title: (s.title ?? "").slice(0, 80),
+      scale: Math.min(140, Math.max(70, Number(s.scale) || 100)),
       config: s.config ?? {},
     }));
   }

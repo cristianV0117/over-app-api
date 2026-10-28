@@ -99,6 +99,9 @@ export class CvSectionModel {
   @Prop({ default: "" })
   title!: string;
 
+  @Prop({ default: 100 })
+  scale!: number;
+
   @Prop({ type: Object, default: {} })
   config!: Record<string, unknown>;
 }
