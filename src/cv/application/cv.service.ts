@@ -97,14 +97,21 @@ export class CvService {
     user: { name?: string; email?: string }
   ): Promise<CvDto> {
     const name = (body.name?.trim() || "Mi CV").slice(0, 80);
+    const imported = Boolean(body.theme || body.header || body.sections?.length);
     const doc = await this.model.create({
       userId: new Types.ObjectId(userId),
       name,
-      locale: "es",
+      locale: body.locale === "en" ? "en" : "es",
       translatedFromId: null,
-      theme: DEFAULT_CV_THEME,
-      header: defaultCvHeader(user.name ?? "", user.email ?? ""),
-      sections: defaultCvSections(),
+      theme: body.theme ? { ...DEFAULT_CV_THEME, ...body.theme } : DEFAULT_CV_THEME,
+      header: {
+        ...defaultCvHeader(user.name ?? "", user.email ?? ""),
+        ...(body.header ?? {}),
+      },
+      sections:
+        imported && body.sections?.length
+          ? this.normalizeSections(body.sections)
+          : defaultCvSections(),
     });
     return this.toDto(doc);
   }
