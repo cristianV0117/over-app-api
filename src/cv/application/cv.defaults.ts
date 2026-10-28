@@ -1,6 +1,8 @@
 import type {
+  CvColumn,
   CvHeaderModel,
   CvSectionModel,
+  CvSectionType,
   CvThemeModel,
 } from "src/shared/infrastructure/mongo/schemas/cv.schema";
 
@@ -32,7 +34,7 @@ export function defaultCvHeader(name: string, email: string): CvHeaderModel {
 }
 
 export function defaultCvSections(): CvSectionModel[] {
-  return [
+  const sections = [
     {
       id: "about-1",
       type: "about",
@@ -204,4 +206,13 @@ export function defaultCvSections(): CvSectionModel[] {
       },
     },
   ];
+  return sections.map(
+    (section): CvSectionModel => ({
+      ...section,
+      type: section.type as CvSectionType,
+      column: section.column as CvColumn,
+      scale: 100,
+      breakBefore: false,
+    })
+  );
 }
