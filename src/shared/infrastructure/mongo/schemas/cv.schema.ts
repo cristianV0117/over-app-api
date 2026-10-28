@@ -102,6 +102,9 @@ export class CvSectionModel {
   @Prop({ default: 100 })
   scale!: number;
 
+  @Prop({ default: false })
+  breakBefore!: boolean;
+
   @Prop({ type: Object, default: {} })
   config!: Record<string, unknown>;
 }

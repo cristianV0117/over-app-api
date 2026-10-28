@@ -149,6 +149,10 @@ export class CvSectionDto {
   scale?: number;
 
   @IsOptional()
+  @IsBoolean()
+  breakBefore?: boolean;
+
+  @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
 }

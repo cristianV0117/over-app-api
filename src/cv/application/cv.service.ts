@@ -51,6 +51,7 @@ export type CvSectionDto = {
   visible: boolean;
   title: string;
   scale: number;
+  breakBefore: boolean;
   config: Record<string, unknown>;
 };
 
@@ -172,6 +173,7 @@ export class CvService {
           return {
             ...section,
             scale: original?.scale ?? section.scale ?? 100,
+            breakBefore: Boolean(original?.breakBefore ?? section.breakBefore),
           };
         }),
         sourceSections
@@ -189,6 +191,7 @@ export class CvService {
       visible?: boolean;
       title?: string;
       scale?: number;
+      breakBefore?: boolean;
       config?: Record<string, unknown>;
     }>
   ): CvSectionModel[] {
@@ -200,6 +203,7 @@ export class CvService {
       visible: s.visible !== false,
       title: (s.title ?? "").slice(0, 80),
       scale: Math.min(140, Math.max(70, Number(s.scale) || 100)),
+      breakBefore: Boolean(s.breakBefore),
       config: s.config ?? {},
     }));
   }
