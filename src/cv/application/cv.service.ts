@@ -30,6 +30,7 @@ export type CvThemeDto = {
   chipText: string;
   fontFamily: string;
   repeatSidebar: boolean;
+  fontScale: number;
 };
 
 export type CvHeaderDto = {
@@ -278,6 +279,10 @@ export class CvService {
             chipText: theme.chipText,
             fontFamily: theme.fontFamily || DEFAULT_CV_THEME.fontFamily,
             repeatSidebar: Boolean(theme.repeatSidebar),
+            fontScale: Math.min(
+              125,
+              Math.max(80, Number(theme.fontScale) || DEFAULT_CV_THEME.fontScale || 100)
+            ),
           }
         : {}),
     };

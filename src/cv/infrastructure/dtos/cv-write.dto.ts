@@ -6,6 +6,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -67,6 +68,13 @@ export class CvThemeDto {
   @IsOptional()
   @IsBoolean()
   repeatSidebar?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(80)
+  @Max(125)
+  fontScale?: number;
 }
 
 export class CvHeaderDto {

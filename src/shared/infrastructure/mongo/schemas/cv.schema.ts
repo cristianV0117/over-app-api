@@ -50,6 +50,9 @@ export class CvThemeModel {
 
   @Prop({ default: false })
   repeatSidebar!: boolean;
+
+  @Prop({ default: 100 })
+  fontScale!: number;
 }
 
 @Schema({ _id: false })

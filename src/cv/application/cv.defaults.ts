@@ -16,6 +16,7 @@ export const DEFAULT_CV_THEME: CvThemeModel = {
   chipText: "#FFFFFF",
   fontFamily: "calibri",
   repeatSidebar: false,
+  fontScale: 100,
 };
 
 export function defaultCvHeader(name: string, email: string): CvHeaderModel {
