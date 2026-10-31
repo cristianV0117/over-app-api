@@ -24,6 +24,7 @@ import { JwtStrategy } from "src/shared/infrastructure/strategies/jwt.strategy";
 import { UsersLoginMongoImplementation } from "src/users/infrastructure/implementations/mongo/users-login-mongo.implementation";
 import { CronJobsService } from "src/cron/application/cron.service";
 import { CronController } from "../controllers/cron.controller";
+import { NotificationsModule } from "src/notifications/infrastructure/modules/notifications.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { CronController } from "../controllers/cron.controller";
       secret: process.env.JWT_SECRET || "secretKey",
       signOptions: { expiresIn: "1d" },
     }),
+    NotificationsModule,
   ],
   controllers: [CronController],
   providers: [

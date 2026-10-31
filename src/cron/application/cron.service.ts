@@ -14,6 +14,8 @@ import { CronConfigPutDto } from "../infrastructure/dtos/cron-config-put.dto";
 import { UsersLoginRepository } from "src/users/domain/repositories/users-login.repository";
 import { assertCronExpression, cronSlotIfDue } from "./cron-expression";
 import { formatDemoCheckInLog, runDemoCheckIn } from "./demo-checkin";
+import { NotificationsService } from "src/notifications/application/notifications.service";
+import { bogotaYmd } from "src/notifications/application/bogota-date";
 
 const MAX_LOGS_PER_USER = 200;
 const DEFAULT_CRON = "40 3 * * 1-5";
@@ -46,7 +48,8 @@ export class CronJobsService {
     @InjectModel(CronLogModel.name)
     private readonly logModel: Model<CronLogDocument>,
     @Inject("UsersLoginRepository")
-    private readonly users: UsersLoginRepository
+    private readonly users: UsersLoginRepository,
+    private readonly notifications: NotificationsService
   ) {}
 
   async getConfig(userId: string): Promise<CronConfigDto> {
@@ -210,6 +213,18 @@ export class CronJobsService {
     if (extra.length) {
       await this.logModel.deleteMany({
         _id: { $in: extra.map((x) => x._id) },
+      });
+    }
+    if (/error/i.test(message)) {
+      const { iso } = bogotaYmd();
+      await this.notifications.createIfNew({
+        userId,
+        type: "cron",
+        severity: "urgent",
+        title: "El cron falló",
+        body: message.split("\n")[0]?.slice(0, 240) || "Revisa los logs del cron.",
+        href: "/dashboard/cron",
+        dedupeKey: `cron:error:${iso}`,
       });
     }
     return {
