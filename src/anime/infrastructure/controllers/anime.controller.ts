@@ -28,13 +28,20 @@ export class AnimeController {
     @Query("page") page?: string,
     @Query("genre") genre?: string,
     @Query("format") format?: string,
-    @Query("sort") sort?: string
+    @Query("sort") sort?: string,
+    @Query("mainOnly") mainOnly?: string
   ) {
     return this.anime.search(q ?? "", page ? Number(page) : 1, {
       genre,
       format,
       sort,
+      mainOnly: mainOnly === "1" || mainOnly === "true",
     });
+  }
+
+  @Get("media/:anilistId")
+  detail(@Param("anilistId") anilistId: string) {
+    return this.anime.detail(Number(anilistId));
   }
 
   @Get("genres")
@@ -83,6 +90,11 @@ export class AnimeController {
     @Body() body: AnimeUpdateDto
   ) {
     return this.anime.update(req.user.id, id, body);
+  }
+
+  @Delete("me/all")
+  clear(@Req() req: RequestWithUser) {
+    return this.anime.clear(req.user.id);
   }
 
   @Delete("me/:id")

@@ -18,10 +18,33 @@ const MEDIA_FIELDS = `
   description(asHtml: false)
   siteUrl
   studios(isMain: true) { nodes { name } }
+  nextAiringEpisode { episode airingAt }
+`;
+
+const RELATIONS_LIGHT = `
+  relations {
+    edges {
+      relationType(version: 2)
+      node { id type format }
+    }
+  }
+`;
+
+const RELATED_FIELDS = `
+  id
+  type
+  title { romaji english native }
+  coverImage { large medium }
+  format
+  episodes
+  averageScore
+  seasonYear
+  status
+  nextAiringEpisode { episode airingAt }
 `;
 
 const SEARCH_QUERY = `
-  query ($search: String, $page: Int, $perPage: Int, $genre: String, $format: MediaFormat, $sort: [MediaSort]) {
+  query ($search: String, $page: Int, $perPage: Int, $genre: String, $format: MediaFormat, $formatIn: [MediaFormat], $sort: [MediaSort]) {
     Page(page: $page, perPage: $perPage) {
       pageInfo { currentPage hasNextPage lastPage }
       media(
@@ -29,10 +52,12 @@ const SEARCH_QUERY = `
         search: $search
         genre: $genre
         format: $format
+        format_in: $formatIn
         isAdult: false
         sort: $sort
       ) {
         ${MEDIA_FIELDS}
+        ${RELATIONS_LIGHT}
       }
     }
   }
@@ -42,6 +67,20 @@ const MEDIA_QUERY = `
   query ($id: Int!) {
     Media(id: $id, type: ANIME) {
       ${MEDIA_FIELDS}
+      relations {
+        edges {
+          relationType(version: 2)
+          node {
+            ${RELATED_FIELDS}
+            relations {
+              edges {
+                relationType(version: 2)
+                node { ${RELATED_FIELDS} }
+              }
+            }
+          }
+        }
+      }
     }
   }
 `;
@@ -63,23 +102,49 @@ const BROWSE_GENRES_QUERY = `
   }
 `;
 
+export type AnilistNextEpisode = {
+  episode: number;
+  airingAt: number;
+};
+
 export type AnilistMedia = {
   id: number;
   type?: string | null;
   title: { romaji: string | null; english: string | null; native: string | null };
   coverImage: { extraLarge?: string | null; large?: string | null; medium?: string | null };
-  bannerImage: string | null;
-  genres: string[];
+  bannerImage?: string | null;
+  genres?: string[];
   format: string | null;
   episodes: number | null;
   averageScore: number | null;
-  season: string | null;
+  season?: string | null;
   seasonYear: number | null;
   status: string | null;
-  description: string | null;
-  siteUrl: string | null;
-  studios: { nodes: { name: string }[] };
+  description?: string | null;
+  siteUrl?: string | null;
+  studios?: { nodes: { name: string }[] };
+  nextAiringEpisode?: AnilistNextEpisode | null;
+  relations?: {
+    edges: {
+      relationType: string;
+      node: AnilistMedia | null;
+    }[];
+  };
 };
+
+export function isMainWork(m: AnilistMedia, explicitFormat?: string): boolean {
+  const format = m.format ?? "";
+  const edges = m.relations?.edges ?? [];
+  const hasPrequel = edges.some(
+    (e) => e.relationType === "PREQUEL" && e.node?.type === "ANIME"
+  );
+  const hasParent = edges.some(
+    (e) => e.relationType === "PARENT" && e.node?.type === "ANIME"
+  );
+  if (explicitFormat) return !hasPrequel && !hasParent;
+  if (format === "TV" || format === "ONA") return !hasPrequel;
+  return false;
+}
 
 @Injectable()
 export class AnilistClient {
@@ -91,27 +156,41 @@ export class AnilistClient {
     format?: string;
     sort?: string;
     page?: number;
-  }): Promise<{ items: AnilistMedia[]; page: number; hasNextPage: boolean }> {
+    mainOnly?: boolean;
+  }): Promise<{
+    items: AnilistMedia[];
+    page: number;
+    hasNextPage: boolean;
+    lastPage: number;
+  }> {
     const sort = opts.search?.trim()
       ? ["SEARCH_MATCH", opts.sort || "POPULARITY_DESC"]
       : [opts.sort || "POPULARITY_DESC"];
+    const mainOnly = !!opts.mainOnly;
+    const explicitFormat = opts.format?.trim() || undefined;
     const data = await this.request<{
       Page: {
-        pageInfo: { currentPage: number; hasNextPage: boolean };
+        pageInfo: { currentPage: number; hasNextPage: boolean; lastPage: number };
         media: AnilistMedia[];
       };
     }>(SEARCH_QUERY, {
       search: opts.search?.trim() || undefined,
       genre: opts.genre?.trim() || undefined,
-      format: opts.format?.trim() || undefined,
+      format: explicitFormat,
+      formatIn: mainOnly && !explicitFormat ? ["TV", "ONA"] : undefined,
       page: opts.page ?? 1,
       perPage: 24,
       sort,
     });
+    const raw = data.Page.media ?? [];
+    const items = mainOnly
+      ? raw.filter((m) => isMainWork(m, explicitFormat))
+      : raw;
     return {
-      items: data.Page.media ?? [],
+      items,
       page: data.Page.pageInfo.currentPage,
       hasNextPage: data.Page.pageInfo.hasNextPage,
+      lastPage: data.Page.pageInfo.lastPage ?? data.Page.pageInfo.currentPage,
     };
   }
 

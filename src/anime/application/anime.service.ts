@@ -40,19 +40,38 @@ export type AnimeEntryDto = {
   updatedAt: string;
 };
 
-export type AnimeRecommendationDto = {
+export type AnimeCatalogItemDto = {
   anilistId: number;
   title: string;
   titleEnglish: string;
   coverImage: string;
+  bannerImage: string;
   genres: string[];
   format: string;
   episodes: number | null;
   anilistScore: number | null;
   seasonYear: number | null;
+  anilistStatus: string;
   description: string;
+  nextEpisode: { episode: number; airingAt: number } | null;
+};
+
+export type AnimeRecommendationDto = AnimeCatalogItemDto & {
   score: number;
   because: string[];
+};
+
+export type AnimeDetailDto = AnimeCatalogItemDto & {
+  titleNative: string;
+  season: string;
+  studios: string[];
+  siteUrl: string;
+  relations: {
+    seasons: AnimeCatalogItemDto[];
+    movies: AnimeCatalogItemDto[];
+    ovas: AnimeCatalogItemDto[];
+    others: AnimeCatalogItemDto[];
+  };
 };
 
 @Injectable()
@@ -71,7 +90,7 @@ export class AnimeService {
   async search(
     q: string,
     page = 1,
-    opts: { genre?: string; format?: string; sort?: string } = {}
+    opts: { genre?: string; format?: string; sort?: string; mainOnly?: boolean } = {}
   ) {
     const res = await this.anilist.search({
       search: q,
@@ -79,16 +98,36 @@ export class AnimeService {
       genre: opts.genre,
       format: opts.format,
       sort: opts.sort,
+      mainOnly: opts.mainOnly,
     });
     return {
       page: res.page,
       hasNextPage: res.hasNextPage,
+      lastPage: res.lastPage,
       items: res.items.map(toCatalogItem),
     };
   }
 
   genres() {
     return this.anilist.genres();
+  }
+
+  async detail(anilistId: number): Promise<AnimeDetailDto> {
+    if (!Number.isFinite(anilistId) || anilistId <= 0) {
+      throw new NotFoundException("No se encontró el anime en AniList");
+    }
+    const media = await this.anilist.getById(anilistId);
+    if (!media) throw new NotFoundException("No se encontró el anime en AniList");
+    const snap = snapshot(media);
+    return {
+      ...toCatalogItem(media),
+      titleNative: snap.titleNative,
+      season: snap.season,
+      studios: snap.studios,
+      siteUrl: snap.siteUrl,
+      description: snap.description,
+      relations: groupRelations(media),
+    };
   }
 
   async recommend(userId: string): Promise<AnimeRecommendationDto[]> {
@@ -330,6 +369,14 @@ export class AnimeService {
     return { deleted: true };
   }
 
+  async clear(userId: string): Promise<{ deleted: number }> {
+    const res = await this.entries
+      .deleteMany({ userId: new Types.ObjectId(userId) })
+      .exec();
+    this.bustRecCache(userId);
+    return { deleted: res.deletedCount ?? 0 };
+  }
+
   private bustRecCache(userId: string) {
     const prefix = `${userId}:`;
     for (const key of this.recCache.keys()) {
@@ -383,20 +430,86 @@ function seedWeight(d: {
   return w;
 }
 
-function toCatalogItem(m: AnilistMedia) {
+function toCatalogItem(m: AnilistMedia): AnimeCatalogItemDto {
   return {
     anilistId: m.id,
     title: m.title.romaji || m.title.english || m.title.native || "Sin título",
     titleEnglish: m.title.english ?? "",
     coverImage:
       m.coverImage.large || m.coverImage.extraLarge || m.coverImage.medium || "",
+    bannerImage: m.bannerImage ?? "",
     genres: m.genres ?? [],
     format: m.format ?? "",
     episodes: m.episodes,
     anilistScore: m.averageScore,
     seasonYear: m.seasonYear,
+    anilistStatus: m.status ?? "",
     description: stripHtml(m.description ?? "").slice(0, 400),
+    nextEpisode: m.nextAiringEpisode
+      ? {
+          episode: m.nextAiringEpisode.episode,
+          airingAt: m.nextAiringEpisode.airingAt,
+        }
+      : null,
   };
+}
+
+function groupRelations(root: AnilistMedia): AnimeDetailDto["relations"] {
+  const byId = new Map<number, AnilistMedia>();
+  const visit = (media: AnilistMedia | null | undefined, depth: number) => {
+    if (!media) return;
+    for (const edge of media.relations?.edges ?? []) {
+      const node = edge.node;
+      if (!node?.id || node.id === root.id || node.type !== "ANIME") continue;
+      if (!byId.has(node.id)) byId.set(node.id, node);
+      if (
+        depth < 1 &&
+        (edge.relationType === "PREQUEL" || edge.relationType === "SEQUEL")
+      ) {
+        visit(node, depth + 1);
+      }
+    }
+  };
+  visit(root, 0);
+
+  const seasons: AnimeCatalogItemDto[] = [];
+  const movies: AnimeCatalogItemDto[] = [];
+  const ovas: AnimeCatalogItemDto[] = [];
+  const others: AnimeCatalogItemDto[] = [];
+  const relationOf = (id: number) => {
+    const hop1 = root.relations?.edges ?? [];
+    const direct = hop1.find((e) => e.node?.id === id)?.relationType;
+    if (direct) return direct;
+    for (const e of hop1) {
+      const nested = e.node?.relations?.edges ?? [];
+      const found = nested.find((n) => n.node?.id === id)?.relationType;
+      if (found) return found;
+    }
+    return "";
+  };
+
+  for (const node of byId.values()) {
+    const item = toCatalogItem(node);
+    const fmt = node.format ?? "";
+    const rel = relationOf(node.id);
+    if (rel === "PREQUEL" || rel === "SEQUEL") {
+      seasons.push(item);
+    } else if (fmt === "MOVIE") {
+      movies.push(item);
+    } else if (fmt === "OVA" || fmt === "SPECIAL") {
+      ovas.push(item);
+    } else {
+      others.push(item);
+    }
+  }
+
+  const byYear = (a: AnimeCatalogItemDto, b: AnimeCatalogItemDto) =>
+    (a.seasonYear ?? 9999) - (b.seasonYear ?? 9999);
+  seasons.sort(byYear);
+  movies.sort(byYear);
+  ovas.sort(byYear);
+  others.sort(byYear);
+  return { seasons, movies, ovas, others };
 }
 
 function buildBecause(sources: Set<string>, genresHit: Set<string>): string[] {
