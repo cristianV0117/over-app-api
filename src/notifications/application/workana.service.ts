@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Cron } from "@nestjs/schedule";
 import { Model } from "mongoose";
@@ -12,7 +12,6 @@ import {
 } from "src/shared/infrastructure/mongo/schemas/workana-job.schema";
 import { NotificationsService } from "./notifications.service";
 import { scoreWorkanaJob } from "./workana-score";
-import { bogotaYmd } from "./bogota-date";
 
 const WORKANA_ORIGIN = "https://www.workana.com";
 const MAX_STORED = 250;
@@ -58,7 +57,7 @@ export type WorkanaJobDto = {
 };
 
 @Injectable()
-export class WorkanaService implements OnModuleInit {
+export class WorkanaService {
   private readonly logger = new Logger(WorkanaService.name);
 
   constructor(
@@ -68,16 +67,6 @@ export class WorkanaService implements OnModuleInit {
     private readonly users: Model<UserDocument>,
     private readonly notifications: NotificationsService
   ) {}
-
-  onModuleInit() {
-    setTimeout(() => {
-      void this.syncAll().catch((e) =>
-        this.logger.warn(
-          `Workana sync inicial falló: ${e instanceof Error ? e.message : e}`
-        )
-      );
-    }, 12_000);
-  }
 
   @Cron("0 */6 * * *")
   async tick(): Promise<void> {
@@ -117,23 +106,24 @@ export class WorkanaService implements OnModuleInit {
     };
   }
 
-  async syncAll(): Promise<{ fetched: number; newHighlighted: number }> {
+  async syncAll(): Promise<{
+    fetched: number;
+    newHighlighted: number;
+    error?: string;
+  }> {
     const cookie = this.cookie();
     if (!cookie) {
       this.logger.warn(
         "WORKANA_COOKIE no está configurada. Saltando sync de Workana."
       );
-      return { fetched: 0, newHighlighted: 0 };
+      return { fetched: 0, newHighlighted: 0, error: "missing_cookie" };
     }
+    this.logger.log(
+      `Workana cookie lista (${cookie.length} chars, session=${cookie.includes("workana_session=")}, cf=${cookie.includes("cf_clearance=")})`
+    );
 
     const queries = this.queries();
-    const admins = await this.users
-      .find({ role: "admin" })
-      .select("_id")
-      .lean()
-      .exec();
-    const adminIds = admins.map((u) => String(u._id));
-
+    const adminIds = await this.adminIds();
     let fetched = 0;
     let newHighlighted = 0;
     const now = new Date();
@@ -152,22 +142,7 @@ export class WorkanaService implements OnModuleInit {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.logger.warn(`Workana sync error: ${msg}`);
-      const { iso } = bogotaYmd();
-      for (const adminId of adminIds) {
-        await this.notifications.createIfNew({
-          userId: adminId,
-          type: "workana_session",
-          severity: "urgent",
-          title: "Workana: no se pudo leer proyectos",
-          body:
-            msg.includes("401") || msg.includes("403")
-              ? "La sesión de Workana expiró o Cloudflare bloqueó la petición. Actualiza WORKANA_COOKIE."
-              : `Error al consultar Workana: ${msg.slice(0, 240)}`,
-          href: "/dashboard/workana",
-          dedupeKey: `workana-session:${iso}`,
-        });
-      }
-      throw e;
+      return { fetched, newHighlighted, error: msg };
     }
 
     await this.pruneOld();
@@ -177,8 +152,42 @@ export class WorkanaService implements OnModuleInit {
     return { fetched, newHighlighted };
   }
 
+  async ingest(
+    payload: unknown,
+    query = "php"
+  ): Promise<{ fetched: number; newHighlighted: number }> {
+    const jobs = extractRawJobs(payload);
+    const adminIds = await this.adminIds();
+    const now = new Date();
+    let newHighlighted = 0;
+    for (const job of jobs) {
+      const created = await this.upsertJob(job, query, now, adminIds);
+      if (created) newHighlighted += 1;
+    }
+    await this.pruneOld();
+    this.logger.log(
+      `Workana ingest: ${jobs.length} jobs, ${newHighlighted} destacados nuevos`
+    );
+    return { fetched: jobs.length, newHighlighted };
+  }
+
+  private async adminIds(): Promise<string[]> {
+    const admins = await this.users
+      .find({ role: "admin" })
+      .select("_id")
+      .lean()
+      .exec();
+    return admins.map((u) => String(u._id));
+  }
+
   private cookie(): string {
-    return (process.env.WORKANA_COOKIE ?? "").trim();
+    return (process.env.WORKANA_COOKIE ?? "")
+      .trim()
+      .replace(/^["']+|["']+$/g, "")
+      .replace(/[\r\n]+/g, "")
+      .replace(/\s*;\s*/g, "; ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
   }
 
   private queries(): string[] {
@@ -204,6 +213,10 @@ export class WorkanaService implements OnModuleInit {
         "accept-language": "es-419,es;q=0.9",
         "x-requested-with": "XMLHttpRequest",
         referer: url,
+        origin: WORKANA_ORIGIN,
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
         "user-agent":
           "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         cookie,
@@ -336,6 +349,18 @@ export class WorkanaService implements OnModuleInit {
       fetchedAt: new Date(row.fetchedAt).toISOString(),
     };
   }
+}
+
+function extractRawJobs(payload: unknown): RawJob[] {
+  if (Array.isArray(payload)) return payload as RawJob[];
+  if (!payload || typeof payload !== "object") return [];
+  const root = payload as { results?: unknown };
+  if (Array.isArray(root.results)) return root.results as RawJob[];
+  if (root.results && typeof root.results === "object") {
+    const inner = root.results as { results?: unknown };
+    if (Array.isArray(inner.results)) return inner.results as RawJob[];
+  }
+  return [];
 }
 
 function stripHtml(html: string): string {
