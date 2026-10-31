@@ -48,8 +48,18 @@ export class AnimeService {
     private readonly anilist: AnilistClient
   ) {}
 
-  async search(q: string, page = 1, genre?: string) {
-    const res = await this.anilist.search({ search: q, page, genre });
+  async search(
+    q: string,
+    page = 1,
+    opts: { genre?: string; format?: string; sort?: string } = {}
+  ) {
+    const res = await this.anilist.search({
+      search: q,
+      page,
+      genre: opts.genre,
+      format: opts.format,
+      sort: opts.sort,
+    });
     return {
       page: res.page,
       hasNextPage: res.hasNextPage,

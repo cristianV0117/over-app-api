@@ -20,13 +20,14 @@ const MEDIA_FIELDS = `
 `;
 
 const SEARCH_QUERY = `
-  query ($search: String, $page: Int, $perPage: Int, $genre: String, $sort: [MediaSort]) {
+  query ($search: String, $page: Int, $perPage: Int, $genre: String, $format: MediaFormat, $sort: [MediaSort]) {
     Page(page: $page, perPage: $perPage) {
       pageInfo { currentPage hasNextPage lastPage }
       media(
         type: ANIME
         search: $search
         genre: $genre
+        format: $format
         isAdult: false
         sort: $sort
       ) {
@@ -70,8 +71,13 @@ export class AnilistClient {
   async search(opts: {
     search?: string;
     genre?: string;
+    format?: string;
+    sort?: string;
     page?: number;
   }): Promise<{ items: AnilistMedia[]; page: number; hasNextPage: boolean }> {
+    const sort = opts.search?.trim()
+      ? ["SEARCH_MATCH", opts.sort || "POPULARITY_DESC"]
+      : [opts.sort || "POPULARITY_DESC"];
     const data = await this.request<{
       Page: {
         pageInfo: { currentPage: number; hasNextPage: boolean };
@@ -80,11 +86,10 @@ export class AnilistClient {
     }>(SEARCH_QUERY, {
       search: opts.search?.trim() || undefined,
       genre: opts.genre?.trim() || undefined,
+      format: opts.format?.trim() || undefined,
       page: opts.page ?? 1,
       perPage: 24,
-      sort: opts.search?.trim()
-        ? ["SEARCH_MATCH", "POPULARITY_DESC"]
-        : ["POPULARITY_DESC"],
+      sort,
     });
     return {
       items: data.Page.media ?? [],

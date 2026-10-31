@@ -26,9 +26,15 @@ export class AnimeController {
   search(
     @Query("q") q?: string,
     @Query("page") page?: string,
-    @Query("genre") genre?: string
+    @Query("genre") genre?: string,
+    @Query("format") format?: string,
+    @Query("sort") sort?: string
   ) {
-    return this.anime.search(q ?? "", page ? Number(page) : 1, genre);
+    return this.anime.search(q ?? "", page ? Number(page) : 1, {
+      genre,
+      format,
+      sort,
+    });
   }
 
   @Get("genres")
