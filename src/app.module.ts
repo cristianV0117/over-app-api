@@ -15,6 +15,7 @@ import { FilesModule } from "./files/infrastructure/modules/files.module";
 import { PortfolioModule } from "./portfolio/infrastructure/modules/portfolio.module";
 import { CvModule } from "./cv/infrastructure/modules/cv.module";
 import { NotificationsModule } from "./notifications/infrastructure/modules/notifications.module";
+import { AnimeModule } from "./anime/infrastructure/modules/anime.module";
 import { ThrottlerModule } from "@nestjs/throttler";
 
 @Module({
@@ -55,6 +56,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
     PortfolioModule,
     CvModule,
     NotificationsModule,
+    AnimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

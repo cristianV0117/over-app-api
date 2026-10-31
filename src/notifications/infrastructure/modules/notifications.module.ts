@@ -7,10 +7,6 @@ import {
   NotificationSchema,
 } from "src/shared/infrastructure/mongo/schemas/notification.schema";
 import {
-  WorkanaJobModel,
-  WorkanaJobSchema,
-} from "src/shared/infrastructure/mongo/schemas/workana-job.schema";
-import {
   FinanceDebtModel,
   FinanceDebtSchema,
 } from "src/shared/infrastructure/mongo/schemas/finance-debt.schema";
@@ -64,16 +60,13 @@ import { AdminGuard } from "src/shared/infrastructure/guards/admin.guard";
 import { UsersLoginMongoImplementation } from "src/users/infrastructure/implementations/mongo/users-login-mongo.implementation";
 import { NotificationsService } from "../../application/notifications.service";
 import { NotificationsScanService } from "../../application/notifications-scan.service";
-import { WorkanaService } from "../../application/workana.service";
 import { NotificationsController } from "../controllers/notifications.controller";
-import { WorkanaController } from "../controllers/workana.controller";
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     MongooseModule.forFeature([
       { name: NotificationModel.name, schema: NotificationSchema },
-      { name: WorkanaJobModel.name, schema: WorkanaJobSchema },
       { name: FinanceDebtModel.name, schema: FinanceDebtSchema },
       { name: FinanceDebtPaymentModel.name, schema: FinanceDebtPaymentSchema },
       {
@@ -101,14 +94,13 @@ import { WorkanaController } from "../controllers/workana.controller";
       signOptions: { expiresIn: "1d" },
     }),
   ],
-  controllers: [NotificationsController, WorkanaController],
+  controllers: [NotificationsController],
   providers: [
     JwtStrategy,
     JwtAuthGuard,
     AdminGuard,
     NotificationsService,
     NotificationsScanService,
-    WorkanaService,
     {
       provide: "UsersLoginRepository",
       useClass: UsersLoginMongoImplementation,

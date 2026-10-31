@@ -8,8 +8,6 @@ export const NOTIFICATION_TYPES = [
   "task",
   "vehicle",
   "cron",
-  "workana",
-  "workana_session",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
