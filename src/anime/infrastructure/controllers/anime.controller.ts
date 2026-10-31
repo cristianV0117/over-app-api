@@ -47,6 +47,11 @@ export class AnimeController {
     return this.anime.stats(req.user.id);
   }
 
+  @Get("me/recommendations")
+  recommend(@Req() req: RequestWithUser) {
+    return this.anime.recommend(req.user.id);
+  }
+
   @Get("me")
   list(
     @Req() req: RequestWithUser,

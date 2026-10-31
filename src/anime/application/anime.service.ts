@@ -40,8 +40,28 @@ export type AnimeEntryDto = {
   updatedAt: string;
 };
 
+export type AnimeRecommendationDto = {
+  anilistId: number;
+  title: string;
+  titleEnglish: string;
+  coverImage: string;
+  genres: string[];
+  format: string;
+  episodes: number | null;
+  anilistScore: number | null;
+  seasonYear: number | null;
+  description: string;
+  score: number;
+  because: string[];
+};
+
 @Injectable()
 export class AnimeService {
+  private readonly recCache = new Map<
+    string,
+    { at: number; data: AnimeRecommendationDto[] }
+  >();
+
   constructor(
     @InjectModel(AnimeEntryModel.name)
     private readonly entries: Model<AnimeEntryDocument>,
@@ -63,24 +83,128 @@ export class AnimeService {
     return {
       page: res.page,
       hasNextPage: res.hasNextPage,
-      items: res.items.map((m) => ({
-        anilistId: m.id,
-        title: m.title.romaji || m.title.english || m.title.native || "Sin título",
-        titleEnglish: m.title.english ?? "",
-        coverImage:
-          m.coverImage.large || m.coverImage.extraLarge || m.coverImage.medium || "",
-        genres: m.genres ?? [],
-        format: m.format ?? "",
-        episodes: m.episodes,
-        anilistScore: m.averageScore,
-        seasonYear: m.seasonYear,
-        description: stripHtml(m.description ?? "").slice(0, 400),
-      })),
+      items: res.items.map(toCatalogItem),
     };
   }
 
   genres() {
     return this.anilist.genres();
+  }
+
+  async recommend(userId: string): Promise<AnimeRecommendationDto[]> {
+    const docs = await this.entries
+      .find({ userId: new Types.ObjectId(userId) })
+      .lean()
+      .exec();
+    if (!docs.length) return [];
+
+    const cacheKey = docs
+      .map((d) => `${d.anilistId}:${d.watchStatus}:${d.score ?? ""}:${d.favorite ? 1 : 0}`)
+      .sort()
+      .join("|");
+    const cached = this.recCache.get(`${userId}:${cacheKey}`);
+    if (cached && Date.now() - cached.at < 10 * 60_000) return cached.data;
+
+    const owned = new Set(docs.map((d) => d.anilistId));
+    const seeds = docs
+      .map((d) => ({ doc: d, weight: seedWeight(d) }))
+      .filter((s) => s.weight > 0)
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 12);
+
+    const genreWeight = new Map<string, number>();
+    const formatWeight = new Map<string, number>();
+    for (const { doc, weight } of seeds) {
+      for (const g of doc.genres ?? []) {
+        genreWeight.set(g, (genreWeight.get(g) ?? 0) + weight);
+      }
+      if (doc.format) {
+        formatWeight.set(doc.format, (formatWeight.get(doc.format) ?? 0) + weight);
+      }
+    }
+    const topGenres = [...genreWeight.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([g]) => g);
+
+    let recs: Awaited<ReturnType<AnilistClient["recommendationsFor"]>> = [];
+    try {
+      recs = await this.anilist.recommendationsFor(
+        seeds.map((s) => s.doc.anilistId)
+      );
+    } catch {
+      recs = [];
+    }
+    let extras: AnilistMedia[] = [];
+    if (topGenres.length) {
+      try {
+        extras = await this.anilist.browseByGenres(topGenres, 20);
+      } catch {
+        extras = [];
+      }
+    }
+
+    type Acc = {
+      media: AnilistMedia;
+      score: number;
+      sources: Set<string>;
+      genresHit: Set<string>;
+    };
+    const acc = new Map<number, Acc>();
+
+    const bump = (
+      media: AnilistMedia,
+      add: number,
+      source?: string,
+      genresHit?: string[]
+    ) => {
+      if (!media?.id || owned.has(media.id)) return;
+      if (media.type && media.type !== "ANIME") return;
+      const cur = acc.get(media.id) ?? {
+        media,
+        score: 0,
+        sources: new Set<string>(),
+        genresHit: new Set<string>(),
+      };
+      cur.score += add;
+      if (source) cur.sources.add(source);
+      for (const g of genresHit ?? []) cur.genresHit.add(g);
+      acc.set(media.id, cur);
+    };
+
+    for (const rec of recs) {
+      const overlap = (rec.media.genres ?? []).filter((g) => genreWeight.has(g));
+      const gScore = overlap.reduce((n, g) => n + (genreWeight.get(g) ?? 0), 0);
+      const fmt =
+        rec.media.format && formatWeight.has(rec.media.format) ? 4 : 0;
+      bump(
+        rec.media,
+        Math.max(0, rec.rating) / 8 + gScore * 1.2 + fmt,
+        rec.sourceTitle,
+        overlap
+      );
+    }
+
+    for (const media of extras) {
+      const overlap = (media.genres ?? []).filter((g) => genreWeight.has(g));
+      const gScore = overlap.reduce((n, g) => n + (genreWeight.get(g) ?? 0), 0);
+      bump(media, 4 + gScore, undefined, overlap);
+    }
+
+    const ranked = [...acc.values()]
+      .map((row) => {
+        const multi = row.sources.size > 1 ? row.sources.size * 6 : 0;
+        return {
+          ...toCatalogItem(row.media),
+          score: Math.round((row.score + multi) * 10) / 10,
+          because: buildBecause(row.sources, row.genresHit),
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 18);
+
+    this.recCache.set(`${userId}:${cacheKey}`, { at: Date.now(), data: ranked });
+    return ranked;
   }
 
   async list(
@@ -167,6 +291,7 @@ export class AnimeService {
       favorite: false,
       notes: "",
     });
+    this.bustRecCache(userId);
     return this.toDto(created);
   }
 
@@ -191,6 +316,7 @@ export class AnimeService {
       )
       .exec();
     if (!doc) throw new NotFoundException();
+    this.bustRecCache(userId);
     return this.toDto(doc);
   }
 
@@ -200,7 +326,15 @@ export class AnimeService {
       .deleteOne({ _id: id, userId: new Types.ObjectId(userId) })
       .exec();
     if (!res.deletedCount) throw new NotFoundException();
+    this.bustRecCache(userId);
     return { deleted: true };
+  }
+
+  private bustRecCache(userId: string) {
+    const prefix = `${userId}:`;
+    for (const key of this.recCache.keys()) {
+      if (key.startsWith(prefix)) this.recCache.delete(key);
+    }
   }
 
   private toDto(d: AnimeEntryDocument | Record<string, unknown>): AnimeEntryDto {
@@ -231,6 +365,47 @@ export class AnimeService {
       updatedAt: new Date(row.updatedAt).toISOString(),
     };
   }
+}
+
+function seedWeight(d: {
+  watchStatus: AnimeWatchStatus;
+  favorite?: boolean;
+  score?: number | null;
+}): number {
+  if (d.watchStatus === "dropped") return 0;
+  let w = 1;
+  if (d.favorite) w += 3;
+  if (d.watchStatus === "completed") w += 2;
+  else if (d.watchStatus === "watching") w += 1.5;
+  else if (d.watchStatus === "paused") w += 0.8;
+  else if (d.watchStatus === "planned") w += 0.3;
+  if (d.score != null) w += d.score / 5;
+  return w;
+}
+
+function toCatalogItem(m: AnilistMedia) {
+  return {
+    anilistId: m.id,
+    title: m.title.romaji || m.title.english || m.title.native || "Sin título",
+    titleEnglish: m.title.english ?? "",
+    coverImage:
+      m.coverImage.large || m.coverImage.extraLarge || m.coverImage.medium || "",
+    genres: m.genres ?? [],
+    format: m.format ?? "",
+    episodes: m.episodes,
+    anilistScore: m.averageScore,
+    seasonYear: m.seasonYear,
+    description: stripHtml(m.description ?? "").slice(0, 400),
+  };
+}
+
+function buildBecause(sources: Set<string>, genresHit: Set<string>): string[] {
+  const out = [...sources].slice(0, 3);
+  for (const g of genresHit) {
+    if (out.length >= 4) break;
+    if (!out.includes(g)) out.push(g);
+  }
+  return out;
 }
 
 function snapshot(media: AnilistMedia) {
