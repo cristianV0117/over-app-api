@@ -16,7 +16,7 @@ export class GameEntryModel {
   userId!: Types.ObjectId;
 
   @Prop({ required: true })
-  rawgId!: number;
+  steamAppId!: number;
 
   @Prop({ required: true, trim: true })
   title!: string;
@@ -34,7 +34,7 @@ export class GameEntryModel {
   platforms!: string[];
 
   @Prop({ type: Number, default: null })
-  rawgScore!: number | null;
+  steamScore!: number | null;
 
   @Prop({ type: Number, default: null })
   metacritic!: number | null;
@@ -43,7 +43,7 @@ export class GameEntryModel {
   released!: string;
 
   @Prop({ default: "", trim: true })
-  rawgStatus!: string;
+  steamStatus!: string;
 
   @Prop({ default: "", trim: true })
   description!: string;
@@ -78,7 +78,7 @@ export type GameEntryDocument = GameEntryModel &
 
 export const GameEntrySchema = SchemaFactory.createForClass(GameEntryModel);
 
-GameEntrySchema.index({ userId: 1, rawgId: 1 }, { unique: true });
+GameEntrySchema.index({ userId: 1, steamAppId: 1 }, { unique: true });
 GameEntrySchema.index({ userId: 1, playStatus: 1, updatedAt: -1 });
 GameEntrySchema.index({ userId: 1, score: -1 });
 GameEntrySchema.index({ userId: 1, favorite: 1 });

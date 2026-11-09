@@ -10,21 +10,21 @@ import {
   GameEntryModel,
   GamePlayStatus,
 } from "src/shared/infrastructure/mongo/schemas/game-entry.schema";
-import { RawgClient, RawgGame } from "./rawg.client";
+import { SteamClient, SteamGame } from "./steam.client";
 import { GameAddDto } from "../infrastructure/dtos/game-add.dto";
 import { GameUpdateDto } from "../infrastructure/dtos/game-update.dto";
 
 export type GameCatalogItemDto = {
-  rawgId: number;
+  steamId: number;
   title: string;
   coverImage: string;
   bannerImage: string;
   genres: string[];
   platforms: string[];
-  rawgScore: number | null;
+  steamScore: number | null;
   metacritic: number | null;
   released: string;
-  rawgStatus: string;
+  steamStatus: string;
   description: string;
   playtime: number | null;
 };
@@ -65,7 +65,7 @@ export class GameService {
   constructor(
     @InjectModel(GameEntryModel.name)
     private readonly entries: Model<GameEntryDocument>,
-    private readonly rawg: RawgClient
+    private readonly steam: SteamClient
   ) {}
 
   async search(
@@ -73,7 +73,7 @@ export class GameService {
     page = 1,
     opts: { genre?: string; platform?: string; sort?: string; mainOnly?: boolean } = {}
   ) {
-    const res = await this.rawg.search({
+    const res = await this.steam.search({
       search: q,
       page,
       genre: opts.genre,
@@ -90,22 +90,22 @@ export class GameService {
   }
 
   genres() {
-    return this.rawg.genres();
+    return this.steam.genres();
   }
 
-  async detail(rawgId: number): Promise<GameDetailDto> {
-    if (!Number.isFinite(rawgId) || rawgId <= 0) {
-      throw new NotFoundException("No se encontró el juego en RAWG");
+  async detail(steamId: number): Promise<GameDetailDto> {
+    if (!Number.isFinite(steamId) || steamId <= 0) {
+      throw new NotFoundException("No se encontró el juego en Steam");
     }
-    const game = await this.rawg.getById(rawgId);
-    if (!game) throw new NotFoundException("No se encontró el juego en RAWG");
+    const game = await this.steam.getById(steamId);
+    if (!game) throw new NotFoundException("No se encontró el juego en Steam");
     const snap = snapshot(game);
-    let series: RawgGame[] = [];
-    let extras: RawgGame[] = [];
+    let series: SteamGame[] = [];
+    let extras: SteamGame[] = [];
     try {
       [series, extras] = await Promise.all([
-        this.rawg.series(rawgId),
-        this.rawg.additions(rawgId),
+        this.steam.seriesSearch(game.name, steamId),
+        this.steam.extras(game.dlc),
       ]);
     } catch {
       series = [];
@@ -117,8 +117,8 @@ export class GameService {
       siteUrl: snap.siteUrl,
       description: snap.description,
       relations: {
-        series: series.filter((g) => g.id !== rawgId).map(toCatalogItem),
-        extras: extras.filter((g) => g.id !== rawgId).map(toCatalogItem),
+        series: series.filter((g) => g.id !== steamId).map(toCatalogItem),
+        extras: extras.filter((g) => g.id !== steamId).map(toCatalogItem),
       },
     };
   }
@@ -131,13 +131,13 @@ export class GameService {
     if (!docs.length) return [];
 
     const cacheKey = docs
-      .map((d) => `${d.rawgId}:${d.playStatus}:${d.score ?? ""}:${d.favorite ? 1 : 0}`)
+      .map((d) => `${d.steamAppId}:${d.playStatus}:${d.score ?? ""}:${d.favorite ? 1 : 0}`)
       .sort()
       .join("|");
     const cached = this.recCache.get(`${userId}:${cacheKey}`);
     if (cached && Date.now() - cached.at < 10 * 60_000) return cached.data;
 
-    const owned = new Set(docs.map((d) => d.rawgId));
+    const owned = new Set(docs.map((d) => d.steamAppId));
     const seeds = docs
       .map((d) => ({ doc: d, weight: seedWeight(d) }))
       .filter((s) => s.weight > 0)
@@ -153,13 +153,13 @@ export class GameService {
     const topGenres = [...genreWeight.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 2)
-      .map(([g]) => slugify(g));
+      .map(([g]) => toSteamGenreSlug(g));
 
     const acc = new Map<
       number,
-      { game: RawgGame; score: number; sources: Set<string>; genresHit: Set<string> }
+      { game: SteamGame; score: number; sources: Set<string>; genresHit: Set<string> }
     >();
-    const bump = (game: RawgGame, add: number, source?: string, genresHit?: string[]) => {
+    const bump = (game: SteamGame, add: number, source?: string, genresHit?: string[]) => {
       if (!game?.id || owned.has(game.id)) return;
       const cur = acc.get(game.id) ?? {
         game,
@@ -173,30 +173,20 @@ export class GameService {
       acc.set(game.id, cur);
     };
 
-    for (const { doc } of seeds.slice(0, 6)) {
+    for (const slug of topGenres.filter(Boolean)) {
       try {
-        const sug = await this.rawg.suggested(doc.rawgId, 10);
-        for (const game of sug) {
-          const overlap = (game.genres ?? [])
-            .map((g) => g.name)
-            .filter((g) => genreWeight.has(g));
-          bump(game, 8, doc.title, overlap);
+        const res = await this.steam.search({
+          genre: slug,
+          page: 1,
+          mainOnly: true,
+          sort: "SCORE_DESC",
+        });
+        for (const game of res.items) {
+          const overlap = (game.genres ?? []).filter((g) => genreWeight.has(g));
+          bump(game, 6, undefined, overlap.length ? overlap : [slug]);
         }
       } catch {
-        /* skip seed */
-      }
-    }
-    if (topGenres.length) {
-      try {
-        const extras = await this.rawg.browseByGenres(topGenres, 20);
-        for (const game of extras) {
-          const overlap = (game.genres ?? [])
-            .map((g) => g.name)
-            .filter((g) => genreWeight.has(g));
-          bump(game, 4, undefined, overlap);
-        }
-      } catch {
-        /* ignore */
+        /* skip */
       }
     }
 
@@ -216,27 +206,9 @@ export class GameService {
     return ranked;
   }
 
-  async list(
-    userId: string,
-    opts: {
-      playStatus?: GamePlayStatus;
-      genre?: string;
-      favorite?: boolean;
-      q?: string;
-    } = {}
-  ): Promise<GameEntryDto[]> {
-    const filter: Record<string, unknown> = {
-      userId: new Types.ObjectId(userId),
-    };
-    if (opts.playStatus) filter.playStatus = opts.playStatus;
-    if (opts.favorite) filter.favorite = true;
-    if (opts.genre) filter.genres = opts.genre;
-    if (opts.q?.trim()) {
-      const rx = new RegExp(escapeRegex(opts.q.trim()), "i");
-      filter.title = rx;
-    }
+  async list(userId: string): Promise<GameEntryDto[]> {
     const docs = await this.entries
-      .find(filter)
+      .find({ userId: new Types.ObjectId(userId) })
       .sort({ favorite: -1, score: -1, updatedAt: -1 })
       .lean()
       .exec();
@@ -278,12 +250,12 @@ export class GameService {
   async add(userId: string, body: GameAddDto): Promise<GameEntryDto> {
     const uid = new Types.ObjectId(userId);
     const existing = await this.entries
-      .findOne({ userId: uid, rawgId: body.rawgId })
+      .findOne({ userId: uid, steamAppId: body.steamId })
       .lean()
       .exec();
     if (existing) throw new ConflictException("Ese juego ya está en tu biblioteca");
-    const game = await this.rawg.getById(body.rawgId);
-    if (!game) throw new NotFoundException("No se encontró el juego en RAWG");
+    const game = await this.steam.getById(body.steamId);
+    if (!game) throw new NotFoundException("No se encontró el juego en Steam");
     const snap = snapshot(game);
     const created = await this.entries.create({
       userId: uid,
@@ -347,16 +319,16 @@ export class GameService {
     const row = d as GameEntryDocument;
     return {
       id: String(row._id),
-      rawgId: row.rawgId,
+      steamId: row.steamAppId,
       title: row.title,
       coverImage: row.coverImage ?? "",
       bannerImage: row.bannerImage ?? "",
       genres: row.genres ?? [],
       platforms: row.platforms ?? [],
-      rawgScore: row.rawgScore ?? null,
+      steamScore: row.steamScore ?? null,
       metacritic: row.metacritic ?? null,
       released: row.released ?? "",
-      rawgStatus: row.rawgStatus ?? "",
+      steamStatus: row.steamStatus ?? "",
       description: row.description ?? "",
       playtime: row.playtime ?? null,
       developers: row.developers ?? [],
@@ -387,50 +359,49 @@ function seedWeight(d: {
   return w;
 }
 
-function toCatalogItem(g: RawgGame): GameCatalogItemDto {
-  const released = g.released ?? "";
+function toCatalogItem(g: SteamGame): GameCatalogItemDto {
   return {
-    rawgId: g.id,
+    steamId: g.id,
     title: g.name,
-    coverImage: g.background_image ?? "",
-    bannerImage: g.background_image_additional ?? g.background_image ?? "",
-    genres: (g.genres ?? []).map((x) => x.name),
-    platforms: (g.parent_platforms ?? []).map((p) => p.platform.name),
-    rawgScore: g.rating ? Math.round(g.rating * 20) : null,
-    metacritic: g.metacritic ?? null,
-    released,
-    rawgStatus: gameStatus(released, g.tba),
-    description: stripHtml(g.description_raw ?? "").slice(0, 400),
-    playtime: g.playtime ?? null,
+    coverImage: g.coverImage,
+    bannerImage: g.bannerImage,
+    genres: g.genres,
+    platforms: g.platforms,
+    steamScore: g.score,
+    metacritic: g.score,
+    released: g.released,
+    steamStatus: g.comingSoon ? "COMING" : gameStatus(g.released),
+    description: g.description.slice(0, 400),
+    playtime: null,
   };
 }
 
-function snapshot(g: RawgGame) {
+function snapshot(g: SteamGame) {
   const item = toCatalogItem(g);
   return {
-    rawgId: g.id,
+    steamAppId: g.id,
     title: g.name,
     coverImage: item.coverImage,
     bannerImage: item.bannerImage,
     genres: item.genres,
     platforms: item.platforms,
-    rawgScore: item.rawgScore,
+    steamScore: item.steamScore,
     metacritic: item.metacritic,
     released: item.released,
-    rawgStatus: item.rawgStatus,
-    description: stripHtml(g.description_raw ?? "").slice(0, 2000),
-    developers: (g.developers ?? []).map((d) => d.name),
-    siteUrl: g.website || `https://rawg.io/games/${g.slug}`,
-    playtime: g.playtime ?? null,
+    steamStatus: item.steamStatus,
+    description: g.description.slice(0, 2000),
+    developers: g.developers,
+    siteUrl: g.website,
+    playtime: null,
   };
 }
 
-function gameStatus(released: string, tba?: boolean): string {
-  if (tba || !released) return "TBA";
+function gameStatus(released: string): string {
+  if (!released) return "";
   const t = Date.parse(released);
   if (!Number.isFinite(t)) return "";
-  if (t > Date.now()) return "COMING";
   const days = (Date.now() - t) / 86_400_000;
+  if (days < 0) return "COMING";
   if (days <= 21) return "NEW";
   return "RELEASED";
 }
@@ -444,26 +415,16 @@ function buildBecause(sources: Set<string>, genresHit: Set<string>): string[] {
   return out;
 }
 
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function toSteamGenreSlug(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("acci") || n === "action") return "Action";
+  if (n.includes("aventura") || n === "adventure") return "Adventure";
+  if (n.includes("rol") || n === "rpg") return "RPG";
+  if (n.includes("estrateg")) return "Strategy";
+  if (n.includes("simul")) return "Simulation";
+  if (n.includes("deporte") || n === "sports") return "Sports";
+  if (n.includes("carrera") || n === "racing") return "Racing";
+  if (n.includes("indie")) return "Indie";
+  if (n.includes("gratis") || n.includes("free")) return "Free to Play";
+  return name;
 }

@@ -7,7 +7,7 @@ import {
 } from "src/shared/infrastructure/mongo/schemas/game-entry.schema";
 import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
 import { JwtStrategy } from "src/shared/infrastructure/strategies/jwt.strategy";
-import { RawgClient } from "../../application/rawg.client";
+import { SteamClient } from "../../application/steam.client";
 import { GameService } from "../../application/game.service";
 import { GameController } from "../controllers/game.controller";
 
@@ -22,6 +22,6 @@ import { GameController } from "../controllers/game.controller";
     }),
   ],
   controllers: [GameController],
-  providers: [JwtStrategy, JwtAuthGuard, RawgClient, GameService],
+  providers: [JwtStrategy, JwtAuthGuard, SteamClient, GameService],
 })
 export class GameModule {}

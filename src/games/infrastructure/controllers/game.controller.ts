@@ -12,7 +12,6 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "src/shared/infrastructure/guards/jwt-auth.guard";
 import { RequestWithUser } from "src/shared/infrastructure/types/request-with-user.type";
-import { GAME_PLAY_STATUSES } from "src/shared/infrastructure/mongo/schemas/game-entry.schema";
 import { GameService } from "../../application/game.service";
 import { GameAddDto } from "../dtos/game-add.dto";
 import { GameUpdateDto } from "../dtos/game-update.dto";
@@ -39,9 +38,9 @@ export class GameController {
     });
   }
 
-  @Get("media/:rawgId")
-  detail(@Param("rawgId") rawgId: string) {
-    return this.games.detail(Number(rawgId));
+  @Get("media/:steamId")
+  detail(@Param("steamId") steamId: string) {
+    return this.games.detail(Number(steamId));
   }
 
   @Get("genres")
@@ -60,22 +59,8 @@ export class GameController {
   }
 
   @Get("me")
-  list(
-    @Req() req: RequestWithUser,
-    @Query("status") status?: string,
-    @Query("genre") genre?: string,
-    @Query("favorite") favorite?: string,
-    @Query("q") q?: string
-  ) {
-    const playStatus = GAME_PLAY_STATUSES.includes(status as never)
-      ? (status as (typeof GAME_PLAY_STATUSES)[number])
-      : undefined;
-    return this.games.list(req.user.id, {
-      playStatus,
-      genre,
-      favorite: favorite === "1" || favorite === "true",
-      q,
-    });
+  list(@Req() req: RequestWithUser) {
+    return this.games.list(req.user.id);
   }
 
   @Post("me")

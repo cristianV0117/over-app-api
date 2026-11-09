@@ -6,7 +6,7 @@ export class GameAddDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  rawgId!: number;
+  steamId!: number;
 
   @IsOptional()
   @IsIn([...GAME_PLAY_STATUSES])
