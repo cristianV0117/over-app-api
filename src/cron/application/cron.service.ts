@@ -127,11 +127,11 @@ export class CronJobsService {
           );
           if (!slot) continue;
           const slotKey = slot.toISOString();
-          if (cfg.lastRunSlot === slotKey) continue;
-          await this.configModel.updateOne(
-            { userId: cfg.userId },
+          const claimed = await this.configModel.findOneAndUpdate(
+            { userId: cfg.userId, lastRunSlot: { $ne: slotKey } },
             { $set: { lastRunSlot: slotKey, lastRunAt: now } }
           );
+          if (!claimed) continue;
           const delay = this.pickDelay(cfg.randomDelayMaxSeconds);
           void this.executeDemo(userId, "scheduled", delay).catch((e) => {
             this.logger.warn(
@@ -141,8 +141,15 @@ export class CronJobsService {
           continue;
         }
         const everyMs = Math.max(1, cfg.everyMinutes || 5) * 60_000;
-        const last = cfg.lastRunAt ? new Date(cfg.lastRunAt).getTime() : 0;
-        if (last && now.getTime() - last < everyMs) continue;
+        const cutoff = new Date(now.getTime() - everyMs);
+        const claimed = await this.configModel.findOneAndUpdate(
+          {
+            userId: cfg.userId,
+            $or: [{ lastRunAt: null }, { lastRunAt: { $lte: cutoff } }],
+          },
+          { $set: { lastRunAt: now } }
+        );
+        if (!claimed) continue;
         await this.executeDemo(userId, "scheduled", 0);
       } catch (e) {
         this.logger.warn(
@@ -215,7 +222,7 @@ export class CronJobsService {
         _id: { $in: extra.map((x) => x._id) },
       });
     }
-    if (/error/i.test(message)) {
+    if (isCronFailure(message)) {
       const { iso } = bogotaYmd();
       await this.notifications.createIfNew({
         userId,
@@ -263,4 +270,10 @@ export class CronJobsService {
       lastRunAt: doc.lastRunAt ? new Date(doc.lastRunAt).toISOString() : null,
     };
   }
+}
+
+function isCronFailure(message: string): boolean {
+  if (/ya estabas fichado/i.test(message)) return false;
+  if (/incompatible_check/i.test(message)) return false;
+  return /error/i.test(message) || /HTTP [45]\d\d/.test(message);
 }

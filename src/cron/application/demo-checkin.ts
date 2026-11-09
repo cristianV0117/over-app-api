@@ -94,6 +94,11 @@ export type CheckInResult = Awaited<ReturnType<typeof runCheckIn>>;
 
 export const runDemoCheckIn = runCheckIn;
 
+export function isAlreadyCheckedIn(result: CheckInResult): boolean {
+  if (result.statusCode !== 422) return false;
+  return /incompatible_check/i.test(result.response || "");
+}
+
 export function formatDemoCheckInLog(
   result: CheckInResult,
   opts?: { delaySeconds?: number }
@@ -102,9 +107,15 @@ export function formatDemoCheckInLog(
     opts?.delaySeconds && opts.delaySeconds > 0
       ? ` (delay ${opts.delaySeconds}s)`
       : "";
-  const ok = result.statusCode >= 200 && result.statusCode < 300;
+  const already = isAlreadyCheckedIn(result);
+  const ok = (result.statusCode >= 200 && result.statusCode < 300) || already;
+  const headline = already
+    ? "RESULTADO: ya estabas fichado (Sesame rechazó un segundo check-in)"
+    : ok
+      ? "RESULTADO: petición HTTP exitosa"
+      : `RESULTADO: HTTP ${result.statusCode}`;
   return [
-    ok ? "RESULTADO: petición HTTP exitosa" : `RESULTADO: HTTP ${result.statusCode}`,
+    headline,
     `Método: ${result.method}`,
     `URL: ${result.url}`,
     `Body: ${result.body}`,
